@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAppStore } from '@/stores/app-store';
 import { FormField, Input, Textarea } from '@/components/ui/form-field';
 import { Calendar, Clock, MapPin, Users, Save, X, Plus, Trash2 } from 'lucide-react';
-import { generateEventId, generateSupervisorId } from '@/utils/id-generator';
+import { generateEventId } from '@/utils/id-generator';
 import type { EventFormData } from '@/types';
 
 interface FormErrors {

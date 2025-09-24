@@ -17,7 +17,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { generateTrafficId } from '@/utils/id-generator';
-import type { TrafficControl, TeamMember } from '@/types';
+import type { TrafficControl } from '@/types';
 
 interface TrafficControlForm {
   member_id: string;
@@ -45,7 +45,7 @@ export default function TrafficControlPage() {
           Event Not Found
         </h3>
         <p className="text-gray-600 dark:text-gray-400 mb-6">
-          The event you're trying to manage traffic control for doesn't exist.
+          The event you&apos;re trying to manage traffic control for doesn&apos;t exist.
         </p>
         <Link
           href="/events"

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useAppStore } from '@/stores/app-store';
 import { Settings, Plus, X, Edit2, Trash2 } from 'lucide-react';
-import type { AssignmentCategory } from '@/types';
 
 export default function SettingsPage() {
   const { assignmentCategories } = useAppStore();

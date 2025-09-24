@@ -4,20 +4,19 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppStore } from '@/stores/app-store';
-import { FormField, Input, Select, Textarea } from '@/components/ui/form-field';
+import { FormField, Input, Select } from '@/components/ui/form-field';
 import {
   Calendar,
   Users,
   Plus,
   Trash2,
   Clock,
-  User,
   ArrowLeft,
   Save,
   AlertTriangle
 } from 'lucide-react';
 import { generateAssignmentId } from '@/utils/id-generator';
-import type { TeamAssignment, TeamMember, AssignmentCategory } from '@/types';
+import type { TeamAssignment, AssignmentCategory } from '@/types';
 
 interface AssignmentForm {
   member_id: string;
@@ -48,7 +47,7 @@ export default function EventAssignmentsPage() {
           Event Not Found
         </h3>
         <p className="text-gray-600 dark:text-gray-400 mb-6">
-          The event you're trying to assign teams to doesn't exist.
+          The event you&apos;re trying to assign teams to doesn&apos;t exist.
         </p>
         <Link
           href="/events"

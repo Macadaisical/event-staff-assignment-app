@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAppStore } from '@/stores/app-store';
-import { Plus, Users, Check, X, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Users, Check, X, Trash2 } from 'lucide-react';
 import { generateMemberId } from '@/utils/id-generator';
 import type { TeamMember } from '@/types';
 

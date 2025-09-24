@@ -5,9 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppStore } from '@/stores/app-store';
 import { FormField, Input, Textarea } from '@/components/ui/form-field';
-import { Calendar, Clock, MapPin, Users, Save, X, Plus, Trash2, ArrowLeft } from 'lucide-react';
-import { generateSupervisorId } from '@/utils/id-generator';
-import type { EventFormData, Supervisor } from '@/types';
+import { Calendar, Clock, MapPin, Save, X, ArrowLeft } from 'lucide-react';
+import type { EventFormData } from '@/types';
 
 interface FormErrors {
   [key: string]: string;
@@ -67,7 +66,7 @@ export default function EditEventPage() {
           Event Not Found
         </h3>
         <p className="text-gray-600 dark:text-gray-400 mb-6">
-          The event you're trying to edit doesn't exist or has been deleted.
+          The event you&apos;re trying to edit doesn&apos;t exist or has been deleted.
         </p>
         <Link
           href="/events"
@@ -141,7 +140,7 @@ export default function EditEventPage() {
         meet_location: formData.meet_location.trim(),
         prepared_by: formData.prepared_by.trim(),
         prepared_date: formData.prepared_date,
-        notes: formData.notes.trim() || undefined,
+        notes: formData.notes?.trim() || undefined,
       };
 
       updateEvent(updatedEvent);
@@ -153,28 +152,6 @@ export default function EditEventPage() {
     }
   };
 
-  const addSupervisor = () => {
-    setFormData(prev => ({
-      ...prev,
-      supervisors: [...prev.supervisors, { supervisor_name: '' }]
-    }));
-  };
-
-  const removeSupervisor = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      supervisors: prev.supervisors.filter((_, i) => i !== index)
-    }));
-  };
-
-  const updateSupervisor = (index: number, name: string) => {
-    setFormData(prev => ({
-      ...prev,
-      supervisors: prev.supervisors.map((supervisor, i) =>
-        i === index ? { supervisor_name: name } : supervisor
-      )
-    }));
-  };
 
   return (
     <div className="max-w-4xl mx-auto">

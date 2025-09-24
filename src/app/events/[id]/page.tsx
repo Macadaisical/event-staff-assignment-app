@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAppStore } from '@/stores/app-store';
 import {
@@ -19,7 +19,6 @@ import {
 
 export default function EventDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const {
     events,
     teamMembers,
@@ -38,7 +37,7 @@ export default function EventDetailPage() {
           Event Not Found
         </h3>
         <p className="text-gray-600 dark:text-gray-400 mb-6">
-          The event you're looking for doesn't exist or has been deleted.
+          The event you&apos;re looking for doesn&apos;t exist or has been deleted.
         </p>
         <Link
           href="/events"
@@ -61,7 +60,7 @@ export default function EventDetailPage() {
           text: `Event: ${event.event_name} on ${new Date(event.event_date).toLocaleDateString()}`,
           url: shareUrl,
         });
-      } catch (error) {
+      } catch {
         // Fallback to clipboard
         await navigator.clipboard.writeText(shareUrl);
         alert('Share link copied to clipboard!');

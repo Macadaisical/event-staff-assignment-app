@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { AppStore, Event, TeamMember, AssignmentCategory, TeamAssignment, TrafficControl, Supervisor } from '@/types';
+import type { AppStore, Event, TeamMember, AssignmentCategory } from '@/types';
 import { generateId } from '@/utils/id-generator';
 
 const defaultAssignmentCategories: AssignmentCategory[] = [
