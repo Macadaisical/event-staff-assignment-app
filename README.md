@@ -1,36 +1,139 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Event Staff Assignment Application
 
-## Getting Started
+A comprehensive web application for managing event staffing assignments, built with Next.js 15 and TypeScript.
 
-First, run the development server:
+## 🚀 Features
 
+- **Event Management**: Create, edit, view, and manage events with all required details
+- **Team Member Management**: Full CRUD operations with active/inactive status
+- **Team Assignments**: Dynamic assignment creation with validation and time management
+- **Traffic Control**: Specialized interface for traffic control assignments
+- **PDF Export**: Professional document generation with comprehensive event details
+- **Mobile Responsive**: Touch-friendly interface with hamburger navigation
+- **Data Persistence**: Local storage with Zustand state management
+- **Dark Mode Support**: Professional UI with light and dark themes
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **Styling**: Tailwind CSS 4
+- **State Management**: Zustand with persistence
+- **PDF Generation**: jsPDF
+- **Icons**: Lucide React
+- **Build Tool**: Turbopack
+
+## 📋 Requirements Fulfilled
+
+All functional requirements (FR-1.x through FR-7.x) are implemented:
+
+- ✅ **FR-1**: Complete event creation and management
+- ✅ **FR-2**: Supervisor assignment functionality
+- ✅ **FR-3**: Team member assignment system
+- ✅ **FR-4**: Traffic control management
+- ✅ **FR-5**: Data validation and error handling
+- ✅ **FR-6**: PDF export and sharing capabilities
+- ✅ **FR-7**: Mobile-responsive design
+
+## 🏃‍♂️ Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd event-staff-app
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Start the development server:
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Open [http://localhost:3001](http://localhost:3001) in your browser.
 
-## Learn More
+## 📱 Usage
 
-To learn more about Next.js, take a look at the following resources:
+### Creating Events
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Navigate to **Events** > **Create New Event**
+2. Fill in all required event details
+3. Add supervisors for the event
+4. Save the event
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Managing Team Assignments
 
-## Deploy on Vercel
+1. Go to the event detail page
+2. Click **Manage Assignments**
+3. Add team member assignments with:
+   - Assignment type and equipment/area
+   - Start and end times
+   - Optional notes
+4. Save assignments
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Managing Traffic Control
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. From the event detail page, click **Manage Traffic Control**
+2. Assign staff members to traffic control with:
+   - Patrol vehicle information
+   - Area coverage details
+3. Save traffic control assignments
+
+### Exporting Documents
+
+- Click **Export PDF** on any event detail page
+- Professional PDF includes all event details, assignments, and traffic control information
+
+## 🏗️ Project Structure
+
+```
+src/
+├── app/                    # Next.js app router pages
+│   ├── events/            # Event management pages
+│   ├── team-members/      # Team member management
+│   └── settings/          # Application settings
+├── components/            # Reusable React components
+│   ├── layout/           # Header and navigation
+│   └── ui/               # Form components and UI elements
+├── stores/               # Zustand state management
+├── types/                # TypeScript type definitions
+└── utils/                # Utility functions and helpers
+```
+
+## 🔧 Development
+
+### Available Scripts
+
+- `npm run dev` - Start development server with Turbopack
+- `npm run build` - Build for production
+- `npm start` - Start production server
+- `npm run lint` - Run ESLint
+
+### Key Features
+
+- **Responsive Design**: Mobile-first approach with touch-friendly interfaces
+- **Data Validation**: Comprehensive client-side validation
+- **Error Handling**: User-friendly error messages and recovery
+- **Accessibility**: WCAG compliant with proper ARIA labels
+- **Performance**: Optimized with Next.js 15 and Turbopack
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+---
+
+Built with ❤️ using Next.js and modern web technologies.
