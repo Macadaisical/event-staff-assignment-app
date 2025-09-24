@@ -2,10 +2,29 @@
 
 import Link from 'next/link';
 import { useAppStore } from '@/stores/app-store';
+// TODO: Re-enable Supabase when types are fixed
+// import { useAuth } from '@/components/auth/auth-provider';
+// import { useSupabaseStore } from '@/stores/supabase-store';
+// import LoginForm from '@/components/auth/login-form';
 import { Plus, Calendar, MapPin, Clock } from 'lucide-react';
 
 export default function EventsPage() {
   const { events } = useAppStore();
+
+  // TODO: Re-enable authentication when Supabase types are fixed
+  // const { user, loading } = useAuth();
+  // const { events, fetchEvents, isLoading } = useSupabaseStore();
+  // useEffect(() => {
+  //   if (user) {
+  //     fetchEvents();
+  //   }
+  // }, [user, fetchEvents]);
+  // if (loading) {
+  //   return <div className="flex justify-center p-8">Loading...</div>;
+  // }
+  // if (!user) {
+  //   return <LoginForm />;
+  // }
 
   return (
     <div className="space-y-6">

@@ -2,14 +2,17 @@
 
 import { useState } from 'react';
 import { useAppStore } from '@/stores/app-store';
-import { Plus, Users, Check, X, Trash2 } from 'lucide-react';
 import { generateMemberId } from '@/utils/id-generator';
 import type { TeamMember } from '@/types';
+// TODO: Re-enable Supabase when types are fixed
+import { Plus, Users, Check, X, Trash2 } from 'lucide-react';
 
 export default function TeamMembersPage() {
   const { teamMembers, addTeamMember, updateTeamMember, deleteTeamMember } = useAppStore();
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
+
+  // TODO: Re-enable Supabase integration when types are fixed
 
   const handleAddMember = () => {
     if (newMemberName.trim()) {

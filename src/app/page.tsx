@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { useAppStore } from '@/stores/app-store';
+// TODO: Re-enable when Supabase types are fixed
 import { Calendar, Users, FileText, Plus } from 'lucide-react';
 
 export default function Home() {
   const { events, teamMembers } = useAppStore();
+  // TODO: Re-enable Supabase integration when types are fixed
 
   const recentEvents = events.slice(-3).reverse();
   const activeMembers = teamMembers.filter(member => member.active);
