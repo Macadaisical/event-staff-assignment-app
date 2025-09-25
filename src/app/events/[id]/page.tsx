@@ -8,10 +8,8 @@ import {
   Clock,
   MapPin,
   Users,
-  Settings,
   Edit,
   ArrowLeft,
-  Plus,
   FileText,
   Car
 } from 'lucide-react';

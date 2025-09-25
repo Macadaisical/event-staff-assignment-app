@@ -1,6 +1,10 @@
 import { create } from 'zustand';
-import { supabase } from '@/lib/supabase';
+import { supabase as supabaseClient } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabase = supabaseClient as any;
 import type {
   Event,
   TeamMember,
@@ -16,7 +20,6 @@ type TeamMemberRow = Database['public']['Tables']['team_members']['Row'];
 type TeamAssignmentRow = Database['public']['Tables']['team_assignments']['Row'];
 type TrafficControlRow = Database['public']['Tables']['traffic_controls']['Row'];
 type SupervisorRow = Database['public']['Tables']['supervisors']['Row'];
-type AssignmentCategoryRow = Database['public']['Tables']['assignment_categories']['Row'];
 
 // Conversion functions from database rows to app types
 const dbEventToEvent = (dbEvent: EventRow): Event => ({
@@ -69,7 +72,7 @@ const dbSupervisorToSupervisor = (dbSupervisor: SupervisorRow): Supervisor => ({
 
 interface SupabaseStore {
   // State
-  user: any; // Will be replaced with proper auth types
+  user: User | null;
   events: Event[];
   currentEvent: Event | null;
   isEventLoading: boolean;
@@ -526,7 +529,8 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       if (error) throw error;
 
       if (data.length > 0) {
-        const categories = data.map(cat => cat.category_name as AssignmentCategory);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const categories = data.map((cat: any) => cat.category_name as AssignmentCategory);
         set({ assignmentCategories: categories });
       }
     } catch (error) {

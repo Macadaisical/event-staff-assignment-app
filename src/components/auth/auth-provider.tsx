@@ -59,15 +59,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Create profile if user just signed up
         if (event === 'SIGNED_IN' && session?.user) {
-          const { error } = await supabase
+          const profileData = {
+            id: session.user.id,
+            email: session.user.email || null,
+            full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || null,
+          };
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { error } = await (supabase as any)
             .from('profiles')
-            .upsert([
-              {
-                id: session.user.id,
-                email: session.user.email || null,
-                full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || null,
-              }
-            ], { onConflict: 'id' });
+            .upsert(profileData, { onConflict: 'id' });
 
           if (error) {
             console.error('Error creating/updating profile:', error);
