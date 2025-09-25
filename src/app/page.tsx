@@ -1,13 +1,37 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
-import { useAppStore } from '@/stores/app-store';
-// TODO: Re-enable when Supabase types are fixed
+import { useAuth } from '@/components/auth/auth-provider';
+import { useSupabaseStore } from '@/stores/supabase-store';
+import LoginForm from '@/components/auth/login-form';
 import { Calendar, Users, FileText, Plus } from 'lucide-react';
 
 export default function Home() {
-  const { events, teamMembers } = useAppStore();
-  // TODO: Re-enable Supabase integration when types are fixed
+  const { user, loading } = useAuth();
+  const { events, teamMembers, fetchEvents, fetchTeamMembers } = useSupabaseStore();
+
+  useEffect(() => {
+    if (user) {
+      fetchEvents();
+      fetchTeamMembers();
+    }
+  }, [user, fetchEvents, fetchTeamMembers]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginForm className="mt-12" />;
+  }
 
   const recentEvents = events.slice(-3).reverse();
   const activeMembers = teamMembers.filter(member => member.active);

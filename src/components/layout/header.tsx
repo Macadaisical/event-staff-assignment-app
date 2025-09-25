@@ -1,15 +1,11 @@
 'use client';
 
 import { Navigation } from './navigation';
-// TODO: Re-enable Supabase authentication when types are fixed
-// import { useAuth } from '@/components/auth/auth-provider';
+import { useAuth } from '@/components/auth/auth-provider';
 import { ClipboardList, LogOut, User } from 'lucide-react';
 
 export function Header() {
-  // TODO: Re-enable authentication when Supabase types are fixed
-  // const { user, signOut } = useAuth();
-  const user = null as { email: string } | null; // Temporary
-  const signOut = () => {}; // Temporary
+  const { user, signOut } = useAuth();
 
   return (
     <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 relative z-50">
