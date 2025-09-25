@@ -1,0 +1,9 @@
+name = "event-staff-assignment-app"
+compatibility_date = "2025-09-25"
+
+[env.production]
+compatibility_date = "2025-09-25"
+
+[[env.production.route]]
+pattern = "event-staff-assignment-app.pages.dev/*"
+zone_name = "event-staff-assignment-app.pages.dev"
