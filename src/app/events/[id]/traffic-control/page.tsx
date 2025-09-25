@@ -19,6 +19,7 @@ import {
 import { generateTrafficId } from '@/utils/id-generator';
 import type { TrafficControl } from '@/types';
 
+
 interface TrafficControlForm {
   member_id: string;
   patrol_vehicle: string;
