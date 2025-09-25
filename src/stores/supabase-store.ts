@@ -373,7 +373,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const assignmentsToInsert = assignmentData.map(assignment => ({
         ...assignment,
         event_id: eventId,
-        user_id: user.id,
       }));
 
       const { data, error } = await supabase
@@ -432,7 +431,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const controlsToInsert = controlData.map(control => ({
         ...control,
         event_id: eventId,
-        user_id: user.id,
       }));
 
       const { data, error } = await supabase
@@ -490,7 +488,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const supervisorsToInsert = supervisorData.map(supervisor => ({
         ...supervisor,
         event_id: eventId,
-        user_id: user.id,
       }));
 
       const { data, error } = await supabase

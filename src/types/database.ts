@@ -4,25 +4,28 @@ export interface Database {
       profiles: {
         Row: {
           id: string;
-          user_id: string;
+          email: string | null;
           full_name: string | null;
           organization: string | null;
+          role: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
-          id?: string;
-          user_id: string;
+          id: string;
+          email?: string | null;
           full_name?: string | null;
           organization?: string | null;
+          role?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
-          user_id?: string;
+          email?: string | null;
           full_name?: string | null;
           organization?: string | null;
+          role?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -83,6 +86,10 @@ export interface Database {
           user_id: string;
           member_name: string;
           active: boolean;
+          phone: string | null;
+          email: string | null;
+          emergency_contact: string | null;
+          emergency_phone: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -91,6 +98,10 @@ export interface Database {
           user_id: string;
           member_name: string;
           active?: boolean;
+          phone?: string | null;
+          email?: string | null;
+          emergency_contact?: string | null;
+          emergency_phone?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -99,6 +110,10 @@ export interface Database {
           user_id?: string;
           member_name?: string;
           active?: boolean;
+          phone?: string | null;
+          email?: string | null;
+          emergency_contact?: string | null;
+          emergency_phone?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -106,7 +121,6 @@ export interface Database {
       team_assignments: {
         Row: {
           assignment_id: string;
-          user_id: string;
           event_id: string;
           member_id: string;
           assignment_type: string;
@@ -120,7 +134,6 @@ export interface Database {
         };
         Insert: {
           assignment_id?: string;
-          user_id: string;
           event_id: string;
           member_id: string;
           assignment_type: string;
@@ -128,13 +141,12 @@ export interface Database {
           start_time: string;
           end_time: string;
           notes?: string | null;
-          sort_order: number;
+          sort_order?: number;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           assignment_id?: string;
-          user_id?: string;
           event_id?: string;
           member_id?: string;
           assignment_type?: string;
@@ -150,7 +162,6 @@ export interface Database {
       traffic_controls: {
         Row: {
           traffic_id: string;
-          user_id: string;
           event_id: string;
           member_id: string;
           patrol_vehicle: string;
@@ -161,18 +172,16 @@ export interface Database {
         };
         Insert: {
           traffic_id?: string;
-          user_id: string;
           event_id: string;
           member_id: string;
           patrol_vehicle: string;
           area_assignment: string;
-          sort_order: number;
+          sort_order?: number;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           traffic_id?: string;
-          user_id?: string;
           event_id?: string;
           member_id?: string;
           patrol_vehicle?: string;
@@ -185,25 +194,31 @@ export interface Database {
       supervisors: {
         Row: {
           supervisor_id: string;
-          user_id: string;
           event_id: string;
           supervisor_name: string;
+          phone: string | null;
+          email: string | null;
+          sort_order: number;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           supervisor_id?: string;
-          user_id: string;
           event_id: string;
           supervisor_name: string;
+          phone?: string | null;
+          email?: string | null;
+          sort_order?: number;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           supervisor_id?: string;
-          user_id?: string;
           event_id?: string;
           supervisor_name?: string;
+          phone?: string | null;
+          email?: string | null;
+          sort_order?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -213,25 +228,22 @@ export interface Database {
           category_id: string;
           user_id: string;
           category_name: string;
-          is_default: boolean;
+          description: string | null;
           created_at: string;
-          updated_at: string;
         };
         Insert: {
           category_id?: string;
           user_id: string;
           category_name: string;
-          is_default?: boolean;
+          description?: string | null;
           created_at?: string;
-          updated_at?: string;
         };
         Update: {
           category_id?: string;
           user_id?: string;
           category_name?: string;
-          is_default?: boolean;
+          description?: string | null;
           created_at?: string;
-          updated_at?: string;
         };
       };
     };

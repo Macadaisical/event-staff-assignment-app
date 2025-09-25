@@ -63,10 +63,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             .from('profiles')
             .upsert([
               {
-                user_id: session.user.id,
+                id: session.user.id,
+                email: session.user.email || null,
                 full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || null,
               }
-            ], { onConflict: 'user_id' });
+            ], { onConflict: 'id' });
 
           if (error) {
             console.error('Error creating/updating profile:', error);
