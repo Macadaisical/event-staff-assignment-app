@@ -172,13 +172,8 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       if (!user) throw new Error('Not authenticated');
       console.log('👤 User authenticated:', user.id);
 
-      // Generate event_id to avoid constraint issues
-      const eventId = `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log('🆔 Generated event_id:', eventId);
-
       const insertData = {
         ...eventData,
-        event_id: eventId,
         user_id: user.id,
       };
       console.log('📝 Insert data:', insertData);
@@ -302,18 +297,9 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       if (!user) throw new Error('Not authenticated');
       console.log('👤 User authenticated:', user.id);
 
-      // Generate member_id to avoid constraint issues
-      const memberId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log('🆔 Generated member_id:', memberId);
-
       const insertData = {
         ...memberData,
-        member_id: memberId,
         user_id: user.id,
-        phone: null,
-        email: null,
-        emergency_contact: null,
-        emergency_phone: null,
       };
       console.log('📝 Insert data:', insertData);
 
@@ -403,7 +389,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         .from('team_assignments')
         .select('*')
         .eq('event_id', eventId)
-        .eq('user_id', user.id)
         .order('sort_order');
 
       if (error) throw error;
@@ -461,7 +446,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         .from('traffic_controls')
         .select('*')
         .eq('event_id', eventId)
-        .eq('user_id', user.id)
         .order('sort_order');
 
       if (error) throw error;
@@ -518,8 +502,7 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data, error } = await supabase
         .from('supervisors')
         .select('*')
-        .eq('event_id', eventId)
-        .eq('user_id', user.id);
+        .eq('event_id', eventId);
 
       if (error) throw error;
 
@@ -543,7 +526,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
 
       const supervisorsToInsert = supervisorData.map((supervisor, index) => ({
         ...supervisor,
-        supervisor_id: `supervisor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${index}`,
         event_id: eventId,
         sort_order: index,
       }));
