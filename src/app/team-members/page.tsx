@@ -1,44 +1,81 @@
 'use client';
 
-import { useState } from 'react';
-import { useAppStore } from '@/stores/app-store';
-import { generateMemberId } from '@/utils/id-generator';
+import { useState, useEffect } from 'react';
+import { useSupabaseStore } from '@/stores/supabase-store';
+import { useAuth } from '@/components/auth/auth-provider';
 import type { TeamMember } from '@/types';
-// TODO: Re-enable Supabase when types are fixed
 import { Plus, Users, Check, X, Trash2 } from 'lucide-react';
 
 export default function TeamMembersPage() {
-  const { teamMembers, addTeamMember, updateTeamMember, deleteTeamMember } = useAppStore();
+  const { teamMembers, addTeamMember, updateTeamMember, deleteTeamMember, fetchTeamMembers } = useSupabaseStore();
+  const { user } = useAuth();
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  // TODO: Re-enable Supabase integration when types are fixed
+  useEffect(() => {
+    if (user) {
+      fetchTeamMembers().finally(() => setLoading(false));
+    }
+  }, [user, fetchTeamMembers]);
 
-  const handleAddMember = () => {
-    if (newMemberName.trim()) {
-      const newMember: TeamMember = {
-        member_id: generateMemberId(),
-        member_name: newMemberName.trim(),
-        active: true,
-      };
-      addTeamMember(newMember);
-      setNewMemberName('');
-      setIsAddingMember(false);
+  const handleAddMember = async () => {
+    if (newMemberName.trim() && user) {
+      try {
+        await addTeamMember({
+          member_name: newMemberName.trim(),
+          active: true,
+        });
+        setNewMemberName('');
+        setIsAddingMember(false);
+      } catch (error) {
+        console.error('Error adding team member:', error);
+      }
     }
   };
 
-  const toggleMemberStatus = (member: TeamMember) => {
-    updateTeamMember({ ...member, active: !member.active });
+  const toggleMemberStatus = async (member: TeamMember) => {
+    try {
+      await updateTeamMember({ ...member, active: !member.active });
+    } catch (error) {
+      console.error('Error updating team member:', error);
+    }
   };
 
-  const handleDeleteMember = (memberId: string) => {
+  const handleDeleteMember = async (memberId: string) => {
     if (confirm('Are you sure you want to delete this team member?')) {
-      deleteTeamMember(memberId);
+      try {
+        await deleteTeamMember(memberId);
+      } catch (error) {
+        console.error('Error deleting team member:', error);
+      }
     }
   };
 
   const activeMembers = teamMembers.filter(member => member.active);
   const inactiveMembers = teamMembers.filter(member => !member.active);
+
+  if (!user) {
+    return (
+      <div className="text-center py-12">
+        <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          Please sign in to manage team members
+        </h3>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+          Loading team members...
+        </h3>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

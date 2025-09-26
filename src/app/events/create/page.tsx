@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAppStore } from '@/stores/app-store';
+import { useSupabaseStore } from '@/stores/supabase-store';
+import { useAuth } from '@/components/auth/auth-provider';
 import { FormField, Input, Textarea } from '@/components/ui/form-field';
 import { Calendar, Clock, MapPin, Users, Save, X, Plus, Trash2 } from 'lucide-react';
-import { generateEventId } from '@/utils/id-generator';
 import type { EventFormData } from '@/types';
 
 interface FormErrors {
@@ -15,7 +15,8 @@ interface FormErrors {
 
 export default function CreateEventPage() {
   const router = useRouter();
-  const { addEvent } = useAppStore();
+  const { addEvent } = useSupabaseStore();
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState<EventFormData>({
     event_name: '',
@@ -99,11 +100,15 @@ export default function CreateEventPage() {
       return;
     }
 
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const eventData = {
-        event_id: generateEventId(),
         event_name: formData.event_name.trim(),
         event_date: formData.event_date,
         location: formData.location.trim(),
@@ -114,10 +119,9 @@ export default function CreateEventPage() {
         prepared_by: formData.prepared_by.trim(),
         prepared_date: formData.prepared_date,
         notes: formData.notes?.trim() || undefined,
-        created_at: new Date().toISOString(),
       };
 
-      addEvent(eventData);
+      await addEvent(eventData);
 
       // TODO: Save supervisors, assignments, and traffic controls
       // This will be implemented when we add the assignment interfaces
