@@ -15,7 +15,7 @@ interface FormErrors {
 
 export default function CreateEventPage() {
   const router = useRouter();
-  const { addEvent } = useSupabaseStore();
+  const { addEvent, addSupervisors } = useSupabaseStore();
   const { user } = useAuth();
 
   const [formData, setFormData] = useState<EventFormData>({
@@ -121,9 +121,18 @@ export default function CreateEventPage() {
         notes: formData.notes?.trim() || undefined,
       };
 
-      await addEvent(eventData);
+      const newEvent = await addEvent(eventData);
 
-      // TODO: Save supervisors, assignments, and traffic controls
+      // Save supervisors if any are provided
+      const validSupervisors = formData.supervisors.filter(s => s.supervisor_name.trim());
+      if (validSupervisors.length > 0 && newEvent?.event_id) {
+        console.log('💾 Saving supervisors for event:', newEvent.event_id);
+        await addSupervisors(newEvent.event_id, validSupervisors.map(s => ({
+          supervisor_name: s.supervisor_name.trim(),
+        })));
+      }
+
+      // TODO: Save assignments and traffic controls
       // This will be implemented when we add the assignment interfaces
 
       router.push('/events');

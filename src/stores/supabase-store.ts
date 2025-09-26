@@ -172,18 +172,32 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       if (!user) throw new Error('Not authenticated');
       console.log('👤 User authenticated:', user.id);
 
+      // Generate event_id to avoid constraint issues
+      const eventId = `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('🆔 Generated event_id:', eventId);
+
+      const insertData = {
+        ...eventData,
+        event_id: eventId,
+        user_id: user.id,
+      };
+      console.log('📝 Insert data:', insertData);
+
       const { data, error } = await supabase
         .from('events')
-        .insert([{
-          ...eventData,
-          user_id: user.id,
-        }])
+        .insert([insertData])
         .select()
         .single();
 
       if (error) {
-        console.error('❌ Database error:', error);
-        throw error;
+        console.error('❌ Database error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: error,
+        });
+        throw new Error(`Database error: ${error.message || 'Unknown error'} (Code: ${error.code || 'unknown'})`);
       }
       console.log('✅ Event added successfully:', data);
 
@@ -288,22 +302,36 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       if (!user) throw new Error('Not authenticated');
       console.log('👤 User authenticated:', user.id);
 
+      // Generate member_id to avoid constraint issues
+      const memberId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('🆔 Generated member_id:', memberId);
+
+      const insertData = {
+        ...memberData,
+        member_id: memberId,
+        user_id: user.id,
+        phone: null,
+        email: null,
+        emergency_contact: null,
+        emergency_phone: null,
+      };
+      console.log('📝 Insert data:', insertData);
+
       const { data, error } = await supabase
         .from('team_members')
-        .insert([{
-          ...memberData,
-          user_id: user.id,
-          phone: null,
-          email: null,
-          emergency_contact: null,
-          emergency_phone: null,
-        }])
+        .insert([insertData])
         .select()
         .single();
 
       if (error) {
-        console.error('❌ Database error:', error);
-        throw error;
+        console.error('❌ Database error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: error,
+        });
+        throw new Error(`Database error: ${error.message || 'Unknown error'} (Code: ${error.code || 'unknown'})`);
       }
       console.log('✅ Team member added successfully:', data);
 
@@ -508,21 +536,35 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   },
 
   addSupervisors: async (eventId, supervisorData) => {
+    console.log('👥 Adding supervisors for event:', eventId, supervisorData);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const supervisorsToInsert = supervisorData.map(supervisor => ({
+      const supervisorsToInsert = supervisorData.map((supervisor, index) => ({
         ...supervisor,
+        supervisor_id: `supervisor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${index}`,
         event_id: eventId,
+        sort_order: index,
       }));
+
+      console.log('📝 Supervisors to insert:', supervisorsToInsert);
 
       const { data, error } = await supabase
         .from('supervisors')
         .insert(supervisorsToInsert)
         .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: error,
+        });
+        throw new Error(`Database error: ${error.message || 'Unknown error'} (Code: ${error.code || 'unknown'})`);
+      }
 
       const newSupervisors = data.map(dbSupervisorToSupervisor);
       set((state) => ({
