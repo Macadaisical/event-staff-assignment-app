@@ -1,8 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAppStore } from '@/stores/app-store';
+import { useSupabaseStore } from '@/stores/supabase-store';
 import {
   Calendar,
   Clock,
@@ -15,10 +16,29 @@ import {
 } from 'lucide-react';
 
 export default function EventDetailPage() {
-  const params = useParams();
-  const { events } = useAppStore();
+  const params = useParams<{ id: string }>();
+  const { events, fetchEvents, isEventLoading } = useSupabaseStore();
+
+  useEffect(() => {
+    if (!events.length) {
+      fetchEvents().catch((error: unknown) => {
+        console.error('Error loading events:', error);
+      });
+    }
+  }, [events.length, fetchEvents]);
 
   const event = events.find(e => e.event_id === params.id);
+
+  if (!event && isEventLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading event...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
