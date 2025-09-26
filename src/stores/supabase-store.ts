@@ -166,9 +166,11 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   },
 
   addEvent: async (eventData) => {
+    console.log('📅 Adding event:', eventData);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      console.log('👤 User authenticated:', user.id);
 
       const { data, error } = await supabase
         .from('events')
@@ -179,13 +181,21 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+      console.log('✅ Event added successfully:', data);
 
       const newEvent = dbEventToEvent(data);
-      set((state) => ({ events: [newEvent, ...state.events] }));
+      set((state) => {
+        const updatedEvents = [newEvent, ...state.events];
+        console.log('🔄 Updated events count:', updatedEvents.length);
+        return { events: updatedEvents };
+      });
       return newEvent;
     } catch (error) {
-      console.error('Error adding event:', error);
+      console.error('❌ Error adding event:', error);
       return null;
     }
   },
@@ -272,27 +282,41 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   },
 
   addTeamMember: async (memberData) => {
+    console.log('🔄 Adding team member:', memberData);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      console.log('👤 User authenticated:', user.id);
 
       const { data, error } = await supabase
         .from('team_members')
         .insert([{
           ...memberData,
           user_id: user.id,
+          phone: null,
+          email: null,
+          emergency_contact: null,
+          emergency_phone: null,
         }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+      console.log('✅ Team member added successfully:', data);
 
       const newMember = dbTeamMemberToTeamMember(data);
-      set((state) => ({ teamMembers: [...state.teamMembers, newMember] }));
+      set((state) => {
+        const updatedMembers = [...state.teamMembers, newMember];
+        console.log('🔄 Updated team members count:', updatedMembers.length);
+        return { teamMembers: updatedMembers };
+      });
       return newMember;
     } catch (error) {
-      console.error('Error adding team member:', error);
-      return null;
+      console.error('❌ Error adding team member:', error);
+      throw error;
     }
   },
 
