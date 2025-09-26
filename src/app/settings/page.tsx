@@ -1,13 +1,19 @@
 'use client';
 
-import { useState } from 'react';
-import { useAppStore } from '@/stores/app-store';
+import { useEffect, useState } from 'react';
+import { useSupabaseStore } from '@/stores/supabase-store';
 import { Settings, Plus, X, Edit2, Trash2 } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { assignmentCategories } = useAppStore();
+  const { assignmentCategories, fetchAssignmentCategories } = useSupabaseStore();
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  useEffect(() => {
+    fetchAssignmentCategories().catch((error: unknown) => {
+      console.error('Error loading assignment categories:', error);
+    });
+  }, [fetchAssignmentCategories]);
 
   const handleAddCategory = () => {
     if (newCategoryName.trim()) {
@@ -108,11 +114,11 @@ export default function SettingsPage() {
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Storage</dt>
-            <dd className="text-sm text-gray-900 dark:text-white">Local Storage (Browser)</dd>
+            <dd className="text-sm text-gray-900 dark:text-white">Supabase PostgreSQL</dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Data Persistence</dt>
-            <dd className="text-sm text-gray-900 dark:text-white">Zustand with Persist</dd>
+            <dd className="text-sm text-gray-900 dark:text-white">Supabase-backed Zustand Store</dd>
           </div>
         </dl>
       </div>

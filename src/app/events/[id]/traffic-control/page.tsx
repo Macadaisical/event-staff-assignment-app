@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAppStore } from '@/stores/app-store';
+import { useSupabaseStore } from '@/stores/supabase-store';
 import { FormField, Input, Select } from '@/components/ui/form-field';
 import {
   Calendar,
@@ -16,8 +16,6 @@ import {
   AlertTriangle,
   MapPin
 } from 'lucide-react';
-import { generateTrafficId } from '@/utils/id-generator';
-import type { TrafficControl } from '@/types';
 
 
 interface TrafficControlForm {
@@ -27,9 +25,33 @@ interface TrafficControlForm {
 }
 
 export default function TrafficControlPage() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { events, teamMembers, addTrafficControls } = useAppStore();
+  const {
+    events,
+    teamMembers,
+    addTrafficControls,
+    fetchEvents,
+    fetchTeamMembers,
+    isEventLoading,
+    isTeamMembersLoading,
+  } = useSupabaseStore();
+
+  useEffect(() => {
+    if (!events.length) {
+      fetchEvents().catch((error: unknown) => {
+        console.error('Error loading events:', error);
+      });
+    }
+  }, [events.length, fetchEvents]);
+
+  useEffect(() => {
+    if (!teamMembers.length) {
+      fetchTeamMembers().catch((error: unknown) => {
+        console.error('Error loading team members:', error);
+      });
+    }
+  }, [teamMembers.length, fetchTeamMembers]);
 
   const event = events.find(e => e.event_id === params.id);
   const activeMembers = teamMembers.filter(member => member.active);
@@ -37,6 +59,17 @@ export default function TrafficControlPage() {
   const [trafficControls, setTrafficControls] = useState<TrafficControlForm[]>([]);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  if (!event && (isEventLoading || events.length === 0)) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading event...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -55,6 +88,17 @@ export default function TrafficControlPage() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Events
         </Link>
+      </div>
+    );
+  }
+
+  if (!activeMembers.length && isTeamMembersLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading team members...</p>
+        </div>
       </div>
     );
   }
@@ -178,18 +222,14 @@ export default function TrafficControlPage() {
     setIsSaving(true);
 
     try {
-      // Convert form data to TrafficControl objects
-      const trafficControlsData: TrafficControl[] = trafficControls.map((control, index) => ({
-        traffic_id: generateTrafficId(),
-        event_id: event.event_id,
+      const trafficControlsData = trafficControls.map((control, index) => ({
         member_id: control.member_id,
-        patrol_vehicle: control.patrol_vehicle,
-        area_assignment: control.area_assignment,
+        patrol_vehicle: control.patrol_vehicle.trim(),
+        area_assignment: control.area_assignment.trim(),
         sort_order: index + 1,
       }));
 
-      // Save to store
-      addTrafficControls(event.event_id, trafficControlsData);
+      await addTrafficControls(event.event_id, trafficControlsData);
 
       // Small delay for user feedback
       await new Promise(resolve => setTimeout(resolve, 500));

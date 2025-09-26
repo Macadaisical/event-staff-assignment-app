@@ -1,10 +1,10 @@
 'use client';
 
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAppStore } from '@/stores/app-store';
+import { useSupabaseStore } from '@/stores/supabase-store';
 import { FormField, Input, Select } from '@/components/ui/form-field';
 import {
   Calendar,
@@ -16,8 +16,7 @@ import {
   Save,
   AlertTriangle
 } from 'lucide-react';
-import { generateAssignmentId } from '@/utils/id-generator';
-import type { TeamAssignment, AssignmentCategory } from '@/types';
+import type { AssignmentCategory } from '@/types';
 
 interface AssignmentForm {
   member_id: string;
@@ -29,9 +28,41 @@ interface AssignmentForm {
 }
 
 export default function EventAssignmentsPage() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { events, teamMembers, assignmentCategories, addTeamAssignments } = useAppStore();
+  const {
+    events,
+    teamMembers,
+    assignmentCategories,
+    addTeamAssignments,
+    fetchEvents,
+    fetchTeamMembers,
+    fetchAssignmentCategories,
+    isEventLoading,
+    isTeamMembersLoading,
+  } = useSupabaseStore();
+
+  useEffect(() => {
+    if (!events.length) {
+      fetchEvents().catch((error: unknown) => {
+        console.error('Error loading events:', error);
+      });
+    }
+  }, [events.length, fetchEvents]);
+
+  useEffect(() => {
+    if (!teamMembers.length) {
+      fetchTeamMembers().catch((error: unknown) => {
+        console.error('Error loading team members:', error);
+      });
+    }
+  }, [teamMembers.length, fetchTeamMembers]);
+
+  useEffect(() => {
+    fetchAssignmentCategories().catch((error: unknown) => {
+      console.error('Error loading assignment categories:', error);
+    });
+  }, [fetchAssignmentCategories]);
 
   const event = events.find(e => e.event_id === params.id);
   const activeMembers = teamMembers.filter(member => member.active);
@@ -39,6 +70,17 @@ export default function EventAssignmentsPage() {
   const [assignments, setAssignments] = useState<AssignmentForm[]>([]);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  if (!event && (isEventLoading || events.length === 0)) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading event...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -57,6 +99,17 @@ export default function EventAssignmentsPage() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Events
         </Link>
+      </div>
+    );
+  }
+
+  if (!activeMembers.length && isTeamMembersLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading team members...</p>
+        </div>
       </div>
     );
   }
@@ -186,20 +239,17 @@ export default function EventAssignmentsPage() {
 
     try {
       // Convert form data to TeamAssignment objects
-      const teamAssignmentsData: TeamAssignment[] = assignments.map((assignment, index) => ({
-        assignment_id: generateAssignmentId(),
-        event_id: event.event_id,
+      const assignmentsToInsert = assignments.map((assignment, index) => ({
         member_id: assignment.member_id,
         assignment_type: assignment.assignment_type,
-        equipment_area: assignment.equipment_area,
+        equipment_area: assignment.equipment_area.trim(),
         start_time: assignment.start_time,
         end_time: assignment.end_time,
-        notes: assignment.notes || undefined,
+        notes: assignment.notes?.trim() || undefined,
         sort_order: index + 1,
       }));
 
-      // Save to store
-      addTeamAssignments(event.event_id, teamAssignmentsData);
+      await addTeamAssignments(event.event_id, assignmentsToInsert);
 
       // Small delay for user feedback
       await new Promise(resolve => setTimeout(resolve, 500));

@@ -1,10 +1,10 @@
 'use client';
 
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAppStore } from '@/stores/app-store';
+import { useSupabaseStore } from '@/stores/supabase-store';
 import { FormField, Input, Textarea } from '@/components/ui/form-field';
 import { Calendar, Clock, MapPin, Save, X, ArrowLeft } from 'lucide-react';
 import type { EventFormData } from '@/types';
@@ -14,9 +14,17 @@ interface FormErrors {
 }
 
 export default function EditEventPage() {
-  const params = useParams();
+  const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { events, updateEvent } = useAppStore();
+  const { events, fetchEvents, updateEvent, isEventLoading } = useSupabaseStore();
+
+  useEffect(() => {
+    if (!events.length) {
+      fetchEvents().catch((error: unknown) => {
+        console.error('Error loading events:', error);
+      });
+    }
+  }, [events.length, fetchEvents]);
 
   const event = events.find(e => e.event_id === params.id);
 
@@ -58,6 +66,17 @@ export default function EditEventPage() {
       });
     }
   }, [event]);
+
+  if (!event && isEventLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading event...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -144,7 +163,8 @@ export default function EditEventPage() {
         notes: formData.notes?.trim() || undefined,
       };
 
-      updateEvent(updatedEvent);
+      await updateEvent(updatedEvent);
+      await fetchEvents();
       router.push(`/events/${event.event_id}`);
     } catch (error) {
       console.error('Error updating event:', error);

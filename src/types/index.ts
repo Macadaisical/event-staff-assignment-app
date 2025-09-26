@@ -56,69 +56,9 @@ export interface EventFormData extends Omit<Event, 'event_id' | 'created_at'> {
 }
 
 // Common types
-export type AssignmentCategory =
-  | 'Equipment Operator'
-  | 'Safety Monitor'
-  | 'Setup/Breakdown'
-  | 'Crowd Control'
-  | 'Communications'
-  | 'First Aid'
-  | 'General Support'
-  | 'Technical Support';
+export type AssignmentCategory = string;
 
 export interface SelectOption {
   value: string;
   label: string;
-}
-
-// Store states
-export interface AppStore {
-  // Events
-  events: Event[];
-  currentEvent: Event | null;
-  isEventLoading: boolean;
-
-  // Team Members
-  teamMembers: TeamMember[];
-  isTeamMembersLoading: boolean;
-
-  // Assignment Categories
-  assignmentCategories: AssignmentCategory[];
-
-  // Assignments and Controls
-  teamAssignments: TeamAssignment[];
-  trafficControls: TrafficControl[];
-  supervisors: Supervisor[];
-
-  // Event Actions
-  setEvents: (events: Event[]) => void;
-  setCurrentEvent: (event: Event | null) => void;
-  addEvent: (event: Event) => void;
-  updateEvent: (event: Event) => void;
-  deleteEvent: (eventId: string) => void;
-
-  // Team Member Actions
-  setTeamMembers: (members: TeamMember[]) => void;
-  addTeamMember: (member: TeamMember) => void;
-  updateTeamMember: (member: TeamMember) => void;
-  deleteTeamMember: (memberId: string) => void;
-
-  // Assignment Actions
-  setTeamAssignments: (assignments: TeamAssignment[]) => void;
-  addTeamAssignments: (eventId: string, assignments: TeamAssignment[]) => void;
-  getTeamAssignments: (eventId: string) => TeamAssignment[];
-
-  // Traffic Control Actions
-  setTrafficControls: (controls: TrafficControl[]) => void;
-  addTrafficControls: (eventId: string, controls: TrafficControl[]) => void;
-  getTrafficControls: (eventId: string) => TrafficControl[];
-
-  // Supervisor Actions
-  setSupervisors: (supervisors: Supervisor[]) => void;
-  addSupervisors: (eventId: string, supervisors: Supervisor[]) => void;
-  getSupervisors: (eventId: string) => Supervisor[];
-
-  // Loading States
-  setIsEventLoading: (loading: boolean) => void;
-  setIsTeamMembersLoading: (loading: boolean) => void;
 }
