@@ -3,15 +3,15 @@
 export interface Event {
   event_id: string;
   event_name: string;
-  event_date: string; // ISO date string
-  location: string;
-  start_time: string; // HH:MM format
-  end_time: string; // HH:MM format
-  team_meet_time: string; // HH:MM format
-  meet_location: string;
-  prepared_by: string;
-  prepared_date: string; // ISO date string
-  notes?: string;
+  event_date: string | null; // ISO date string
+  location: string | null;
+  start_time: string | null; // HH:MM format
+  end_time: string | null; // HH:MM format
+  team_meet_time: string | null; // HH:MM format
+  meet_location: string | null;
+  prepared_by: string | null;
+  prepared_date: string | null; // ISO date string
+  notes?: string | null;
   created_at: string; // ISO datetime string
 }
 
@@ -25,11 +25,11 @@ export interface TeamAssignment {
   assignment_id: string;
   event_id: string;
   member_id: string;
-  assignment_type: string;
-  equipment_area: string;
-  start_time: string; // HH:MM format
-  end_time: string; // HH:MM format
-  notes?: string;
+  assignment_type: string | null;
+  equipment_area: string | null;
+  start_time: string | null; // HH:MM format
+  end_time: string | null; // HH:MM format
+  notes?: string | null;
   sort_order: number;
 }
 
@@ -37,8 +37,8 @@ export interface TrafficControl {
   traffic_id: string;
   event_id: string;
   member_id: string;
-  patrol_vehicle: string;
-  area_assignment: string;
+  patrol_vehicle: string | null;
+  area_assignment: string | null;
   sort_order: number;
 }
 
@@ -46,6 +46,8 @@ export interface Supervisor {
   supervisor_id: string;
   event_id: string;
   supervisor_name: string;
+  phone: string | null;
+  email: string | null;
 }
 
 // UI-specific types

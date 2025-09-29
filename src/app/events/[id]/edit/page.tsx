@@ -51,15 +51,15 @@ export default function EditEventPage() {
     if (event) {
       setFormData({
         event_name: event.event_name,
-        event_date: event.event_date,
-        location: event.location,
-        start_time: event.start_time,
-        end_time: event.end_time,
-        team_meet_time: event.team_meet_time,
-        meet_location: event.meet_location,
-        prepared_by: event.prepared_by,
-        prepared_date: event.prepared_date,
-        notes: event.notes || '',
+        event_date: event.event_date ?? '',
+        location: event.location ?? '',
+        start_time: event.start_time ?? '',
+        end_time: event.end_time ?? '',
+        team_meet_time: event.team_meet_time ?? '',
+        meet_location: event.meet_location ?? '',
+        prepared_by: event.prepared_by ?? '',
+        prepared_date: event.prepared_date ?? new Date().toISOString().split('T')[0],
+        notes: event.notes ?? '',
         supervisors: [{ supervisor_name: '' }], // TODO: Load actual supervisors
         team_assignments: [], // TODO: Load actual assignments
         traffic_controls: [], // TODO: Load actual traffic controls
@@ -106,33 +106,9 @@ export default function EditEventPage() {
     if (!formData.event_name.trim()) {
       newErrors.event_name = 'Event name is required';
     }
-    if (!formData.event_date) {
-      newErrors.event_date = 'Event date is required';
-    }
-    if (!formData.location.trim()) {
-      newErrors.location = 'Location is required';
-    }
-    if (!formData.start_time) {
-      newErrors.start_time = 'Start time is required';
-    }
-    if (!formData.end_time) {
-      newErrors.end_time = 'End time is required';
-    }
-    if (!formData.team_meet_time) {
-      newErrors.team_meet_time = 'Team meet time is required';
-    }
-    if (!formData.meet_location.trim()) {
-      newErrors.meet_location = 'Meet location is required';
-    }
-    if (!formData.prepared_by.trim()) {
-      newErrors.prepared_by = 'Prepared by is required';
-    }
-
-    // Time validation
-    if (formData.start_time && formData.end_time) {
-      if (formData.start_time >= formData.end_time) {
-        newErrors.end_time = 'End time must be after start time';
-      }
+    // Time validation (optional but ordered)
+    if (formData.start_time && formData.end_time && formData.start_time >= formData.end_time) {
+      newErrors.end_time = 'End time must be after start time';
     }
 
     setErrors(newErrors);
@@ -152,15 +128,15 @@ export default function EditEventPage() {
       const updatedEvent = {
         ...event,
         event_name: formData.event_name.trim(),
-        event_date: formData.event_date,
-        location: formData.location.trim(),
-        start_time: formData.start_time,
-        end_time: formData.end_time,
-        team_meet_time: formData.team_meet_time,
-        meet_location: formData.meet_location.trim(),
-        prepared_by: formData.prepared_by.trim(),
-        prepared_date: formData.prepared_date,
-        notes: formData.notes?.trim() || undefined,
+        event_date: formData.event_date || null,
+        location: formData.location.trim() || null,
+        start_time: formData.start_time || null,
+        end_time: formData.end_time || null,
+        team_meet_time: formData.team_meet_time || null,
+        meet_location: formData.meet_location.trim() || null,
+        prepared_by: formData.prepared_by.trim() || null,
+        prepared_date: formData.prepared_date || null,
+        notes: formData.notes?.trim() || null,
       };
 
       await updateEvent(updatedEvent);
@@ -232,16 +208,15 @@ export default function EditEventPage() {
               />
             </FormField>
 
-            <FormField label="Location" required error={errors.location}>
+            <FormField label="Location">
               <Input
                 value={formData.location}
                 onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
                 placeholder="Enter event location"
-                error={!!errors.location}
               />
             </FormField>
 
-            <FormField label="Start Time" required error={errors.start_time}>
+            <FormField label="Start Time">
               <div className="relative">
                 <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
@@ -249,12 +224,11 @@ export default function EditEventPage() {
                   value={formData.start_time}
                   onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
                   className="pl-10"
-                  error={!!errors.start_time}
                 />
               </div>
             </FormField>
 
-            <FormField label="End Time" required error={errors.end_time}>
+            <FormField label="End Time" error={errors.end_time}>
               <div className="relative">
                 <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
@@ -262,12 +236,11 @@ export default function EditEventPage() {
                   value={formData.end_time}
                   onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
                   className="pl-10"
-                  error={!!errors.end_time}
                 />
               </div>
             </FormField>
 
-            <FormField label="Team Meet Time" required error={errors.team_meet_time}>
+            <FormField label="Team Meet Time">
               <div className="relative">
                 <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
@@ -275,12 +248,11 @@ export default function EditEventPage() {
                   value={formData.team_meet_time}
                   onChange={(e) => setFormData(prev => ({ ...prev, team_meet_time: e.target.value }))}
                   className="pl-10"
-                  error={!!errors.team_meet_time}
                 />
               </div>
             </FormField>
 
-            <FormField label="Meet Location" required error={errors.meet_location}>
+            <FormField label="Meet Location">
               <div className="relative">
                 <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
@@ -288,21 +260,19 @@ export default function EditEventPage() {
                   onChange={(e) => setFormData(prev => ({ ...prev, meet_location: e.target.value }))}
                   placeholder="Where team should meet"
                   className="pl-10"
-                  error={!!errors.meet_location}
                 />
               </div>
             </FormField>
 
-            <FormField label="Prepared By" required error={errors.prepared_by}>
+            <FormField label="Prepared By">
               <Input
                 value={formData.prepared_by}
                 onChange={(e) => setFormData(prev => ({ ...prev, prepared_by: e.target.value }))}
                 placeholder="Your name"
-                error={!!errors.prepared_by}
               />
             </FormField>
 
-            <FormField label="Date Prepared" required>
+            <FormField label="Date Prepared">
               <Input
                 type="date"
                 value={formData.prepared_date}

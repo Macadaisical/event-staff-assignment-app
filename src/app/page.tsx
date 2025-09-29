@@ -121,7 +121,7 @@ export default function Home() {
                 <div>
                   <p className="font-medium text-gray-900 dark:text-white">{event.event_name}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {new Date(event.event_date).toLocaleDateString()} at {event.location}
+                    {event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Date TBD'} at {event.location || 'Location TBD'}
                   </p>
                 </div>
                 <Link

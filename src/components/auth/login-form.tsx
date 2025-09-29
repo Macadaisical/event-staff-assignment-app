@@ -29,13 +29,18 @@ export default function LoginForm({ className = '' }: LoginFormProps) {
               colors: {
                 brand: '#3b82f6',
                 brandAccent: '#2563eb',
+                inputBackground: '#1f2937',
+                inputText: '#ffffff',
+                inputPlaceholder: '#9ca3af',
+                inputBorder: '#4b5563',
+                inputBorderFocus: '#60a5fa',
               },
             },
           },
           className: {
             container: 'auth-container',
             button: 'auth-button',
-            input: 'auth-input',
+            input: 'auth-input text-white placeholder:text-gray-400 bg-gray-900 border-gray-600 focus:border-blue-500 focus:ring-blue-500',
           },
         }}
         providers={['google', 'github']}

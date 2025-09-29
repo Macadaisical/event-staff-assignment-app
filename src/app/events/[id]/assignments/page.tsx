@@ -34,12 +34,15 @@ export default function EventAssignmentsPage() {
     events,
     teamMembers,
     assignmentCategories,
-    addTeamAssignments,
+    replaceTeamAssignments,
     fetchEvents,
     fetchTeamMembers,
     fetchAssignmentCategories,
     isEventLoading,
     isTeamMembersLoading,
+    fetchTeamAssignments,
+    getTeamAssignments,
+    teamAssignments,
   } = useSupabaseStore();
 
   useEffect(() => {
@@ -65,11 +68,43 @@ export default function EventAssignmentsPage() {
   }, [fetchAssignmentCategories]);
 
   const event = events.find(e => e.event_id === params.id);
+  const eventId = event?.event_id;
   const activeMembers = teamMembers.filter(member => member.active);
 
   const [assignments, setAssignments] = useState<AssignmentForm[]>([]);
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!eventId) {
+      return;
+    }
+
+    fetchTeamAssignments(eventId).catch((error: unknown) => {
+      console.error('Error loading team assignments:', error);
+    });
+  }, [eventId, fetchTeamAssignments]);
+
+  useEffect(() => {
+    if (!eventId || hasInitialized) {
+      return;
+    }
+
+    const existingAssignments = getTeamAssignments(eventId);
+    if (existingAssignments.length) {
+      setAssignments(existingAssignments.map((assignment) => ({
+        member_id: assignment.member_id,
+        assignment_type: assignment.assignment_type || 'General Support',
+        equipment_area: assignment.equipment_area || '',
+        start_time: assignment.start_time || '',
+        end_time: assignment.end_time || '',
+        notes: assignment.notes || '',
+      })));
+    }
+
+    setHasInitialized(true);
+  }, [eventId, getTeamAssignments, hasInitialized, teamAssignments]);
 
   if (!event && (isEventLoading || events.length === 0)) {
     return (
@@ -154,10 +189,10 @@ export default function EventAssignmentsPage() {
   const addAssignment = () => {
     setAssignments(prev => [...prev, {
       member_id: '',
-      assignment_type: 'General Support',
+      assignment_type: assignmentCategories[0] || 'General Support',
       equipment_area: '',
-      start_time: event.start_time,
-      end_time: event.end_time,
+      start_time: event.start_time || '',
+      end_time: event.end_time || '',
       notes: ''
     }]);
   };
@@ -196,7 +231,7 @@ export default function EventAssignmentsPage() {
     const newErrors: {[key: string]: string} = {};
 
     if (assignments.length === 0) {
-      newErrors.general = 'At least one assignment is required';
+      newErrors.general = 'Add at least one assignment for this event.';
       setErrors(newErrors);
       return false;
     }
@@ -205,24 +240,9 @@ export default function EventAssignmentsPage() {
       if (!assignment.member_id) {
         newErrors[`assignment_${index}_member_id`] = 'Team member is required';
       }
-      if (!assignment.assignment_type) {
-        newErrors[`assignment_${index}_assignment_type`] = 'Assignment type is required';
-      }
-      if (!assignment.equipment_area.trim()) {
-        newErrors[`assignment_${index}_equipment_area`] = 'Equipment/Area is required';
-      }
-      if (!assignment.start_time) {
-        newErrors[`assignment_${index}_start_time`] = 'Start time is required';
-      }
-      if (!assignment.end_time) {
-        newErrors[`assignment_${index}_end_time`] = 'End time is required';
-      }
 
-      // Time validation
-      if (assignment.start_time && assignment.end_time) {
-        if (assignment.start_time >= assignment.end_time) {
-          newErrors[`assignment_${index}_end_time`] = 'End time must be after start time';
-        }
+      if (assignment.start_time && assignment.end_time && assignment.start_time >= assignment.end_time) {
+        newErrors[`assignment_${index}_end_time`] = 'End time must be after start time';
       }
     });
 
@@ -241,15 +261,15 @@ export default function EventAssignmentsPage() {
       // Convert form data to TeamAssignment objects
       const assignmentsToInsert = assignments.map((assignment, index) => ({
         member_id: assignment.member_id,
-        assignment_type: assignment.assignment_type,
-        equipment_area: assignment.equipment_area.trim(),
-        start_time: assignment.start_time,
-        end_time: assignment.end_time,
-        notes: assignment.notes?.trim() || undefined,
+        assignment_type: assignment.assignment_type || null,
+        equipment_area: assignment.equipment_area.trim() || null,
+        start_time: assignment.start_time || null,
+        end_time: assignment.end_time || null,
+        notes: assignment.notes?.trim() || null,
         sort_order: index + 1,
       }));
 
-      await addTeamAssignments(event.event_id, assignmentsToInsert);
+      await replaceTeamAssignments(event.event_id, assignmentsToInsert);
 
       // Small delay for user feedback
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -290,7 +310,7 @@ export default function EventAssignmentsPage() {
                 Team Assignments
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
-                {event.event_name} - {new Date(event.event_date).toLocaleDateString()}
+                {event.event_name} · {event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Date TBD'}
               </p>
             </div>
           </div>
@@ -318,11 +338,15 @@ export default function EventAssignmentsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div className="flex items-center text-blue-800 dark:text-blue-200">
             <Calendar className="h-4 w-4 mr-2" />
-            <span>{new Date(event.event_date).toLocaleDateString()}</span>
+            <span>{event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Date TBD'}</span>
           </div>
           <div className="flex items-center text-blue-800 dark:text-blue-200">
             <Clock className="h-4 w-4 mr-2" />
-            <span>{event.start_time} - {event.end_time}</span>
+            <span>
+              {(event.start_time || event.end_time)
+                ? `${event.start_time || 'TBD'} – ${event.end_time || 'TBD'}`
+                : 'Time TBD'}
+            </span>
           </div>
           <div className="flex items-center text-blue-800 dark:text-blue-200">
             <Users className="h-4 w-4 mr-2" />

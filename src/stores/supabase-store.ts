@@ -33,7 +33,7 @@ const dbEventToEvent = (dbEvent: EventRow): Event => ({
   meet_location: dbEvent.meet_location,
   prepared_by: dbEvent.prepared_by,
   prepared_date: dbEvent.prepared_date,
-  notes: dbEvent.notes || undefined,
+  notes: dbEvent.notes,
   created_at: dbEvent.created_at,
 });
 
@@ -51,7 +51,7 @@ const dbTeamAssignmentToTeamAssignment = (dbAssignment: TeamAssignmentRow): Team
   equipment_area: dbAssignment.equipment_area,
   start_time: dbAssignment.start_time,
   end_time: dbAssignment.end_time,
-  notes: dbAssignment.notes || undefined,
+  notes: dbAssignment.notes,
   sort_order: dbAssignment.sort_order,
 });
 
@@ -68,6 +68,8 @@ const dbSupervisorToSupervisor = (dbSupervisor: SupervisorRow): Supervisor => ({
   supervisor_id: dbSupervisor.supervisor_id,
   event_id: dbSupervisor.event_id,
   supervisor_name: dbSupervisor.supervisor_name,
+  phone: dbSupervisor.phone,
+  email: dbSupervisor.email,
 });
 
 interface SupabaseStore {
@@ -99,16 +101,18 @@ interface SupabaseStore {
   // Assignment actions
   fetchTeamAssignments: (eventId: string) => Promise<void>;
   addTeamAssignments: (eventId: string, assignments: Omit<TeamAssignment, 'assignment_id' | 'event_id'>[]) => Promise<void>;
+  replaceTeamAssignments: (eventId: string, assignments: Omit<TeamAssignment, 'assignment_id' | 'event_id'>[]) => Promise<void>;
   getTeamAssignments: (eventId: string) => TeamAssignment[];
 
   // Traffic Control actions
   fetchTrafficControls: (eventId: string) => Promise<void>;
   addTrafficControls: (eventId: string, controls: Omit<TrafficControl, 'traffic_id' | 'event_id'>[]) => Promise<void>;
+  replaceTrafficControls: (eventId: string, controls: Omit<TrafficControl, 'traffic_id' | 'event_id'>[]) => Promise<void>;
   getTrafficControls: (eventId: string) => TrafficControl[];
 
   // Supervisor actions
   fetchSupervisors: (eventId: string) => Promise<void>;
-  addSupervisors: (eventId: string, supervisors: Omit<Supervisor, 'supervisor_id' | 'event_id'>[]) => Promise<void>;
+  replaceSupervisors: (eventId: string, supervisors: Omit<Supervisor, 'supervisor_id' | 'event_id'>[]) => Promise<void>;
   getSupervisors: (eventId: string) => Supervisor[];
 
   // Assignment categories
@@ -410,9 +414,15 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const assignmentsToInsert = assignmentData.map(assignment => ({
-        ...assignment,
+      const assignmentsToInsert = assignmentData.map((assignment, index) => ({
         event_id: eventId,
+        member_id: assignment.member_id,
+        assignment_type: assignment.assignment_type || null,
+        equipment_area: assignment.equipment_area?.trim() || null,
+        start_time: assignment.start_time || null,
+        end_time: assignment.end_time || null,
+        notes: assignment.notes?.trim() || null,
+        sort_order: assignment.sort_order ?? index + 1,
       }));
 
       const { data, error } = await supabase
@@ -428,6 +438,56 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       }));
     } catch (error) {
       console.error('Error adding team assignments:', error);
+    }
+  },
+
+  replaceTeamAssignments: async (eventId, assignmentData) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error: deleteError } = await supabase
+        .from('team_assignments')
+        .delete()
+        .eq('event_id', eventId);
+
+      if (deleteError) throw deleteError;
+
+      if (!assignmentData.length) {
+        set((state) => ({
+          teamAssignments: state.teamAssignments.filter(a => a.event_id !== eventId),
+        }));
+        return;
+      }
+
+      const assignmentsToInsert = assignmentData.map((assignment, index) => ({
+        event_id: eventId,
+        member_id: assignment.member_id,
+        assignment_type: assignment.assignment_type || null,
+        equipment_area: assignment.equipment_area || null,
+        start_time: assignment.start_time || null,
+        end_time: assignment.end_time || null,
+        notes: assignment.notes || null,
+        sort_order: assignment.sort_order ?? index + 1,
+      }));
+
+      const { data, error } = await supabase
+        .from('team_assignments')
+        .insert(assignmentsToInsert)
+        .select();
+
+      if (error) throw error;
+
+      const newAssignments = data.map(dbTeamAssignmentToTeamAssignment);
+      set((state) => ({
+        teamAssignments: [
+          ...state.teamAssignments.filter(a => a.event_id !== eventId),
+          ...newAssignments,
+        ],
+      }));
+    } catch (error) {
+      console.error('Error replacing team assignments:', error);
+      throw error;
     }
   },
 
@@ -467,9 +527,12 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const controlsToInsert = controlData.map(control => ({
-        ...control,
+      const controlsToInsert = controlData.map((control, index) => ({
         event_id: eventId,
+        member_id: control.member_id,
+        patrol_vehicle: control.patrol_vehicle?.trim() || null,
+        area_assignment: control.area_assignment?.trim() || null,
+        sort_order: control.sort_order ?? index + 1,
       }));
 
       const { data, error } = await supabase
@@ -488,6 +551,53 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
     }
   },
 
+  replaceTrafficControls: async (eventId, controlData) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error: deleteError } = await supabase
+        .from('traffic_controls')
+        .delete()
+        .eq('event_id', eventId);
+
+      if (deleteError) throw deleteError;
+
+      if (!controlData.length) {
+        set((state) => ({
+          trafficControls: state.trafficControls.filter(c => c.event_id !== eventId),
+        }));
+        return;
+      }
+
+      const controlsToInsert = controlData.map((control, index) => ({
+        event_id: eventId,
+        member_id: control.member_id,
+        patrol_vehicle: control.patrol_vehicle || null,
+        area_assignment: control.area_assignment || null,
+        sort_order: control.sort_order ?? index + 1,
+      }));
+
+      const { data, error } = await supabase
+        .from('traffic_controls')
+        .insert(controlsToInsert)
+        .select();
+
+      if (error) throw error;
+
+      const newControls = data.map(dbTrafficControlToTrafficControl);
+      set((state) => ({
+        trafficControls: [
+          ...state.trafficControls.filter(c => c.event_id !== eventId),
+          ...newControls,
+        ],
+      }));
+    } catch (error) {
+      console.error('Error replacing traffic controls:', error);
+      throw error;
+    }
+  },
+
   getTrafficControls: (eventId) => {
     const { trafficControls } = get();
     return trafficControls.filter(control => control.event_id === eventId);
@@ -502,7 +612,8 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data, error } = await supabase
         .from('supervisors')
         .select('*')
-        .eq('event_id', eventId);
+        .eq('event_id', eventId)
+        .order('sort_order');
 
       if (error) throw error;
 
@@ -518,42 +629,50 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
     }
   },
 
-  addSupervisors: async (eventId, supervisorData) => {
-    console.log('👥 Adding supervisors for event:', eventId, supervisorData);
+  replaceSupervisors: async (eventId, supervisorData) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const { error: deleteError } = await supabase
+        .from('supervisors')
+        .delete()
+        .eq('event_id', eventId);
+
+      if (deleteError) throw deleteError;
+
+      if (!supervisorData.length) {
+        set((state) => ({
+          supervisors: state.supervisors.filter((supervisor) => supervisor.event_id !== eventId),
+        }));
+        return;
+      }
+
       const supervisorsToInsert = supervisorData.map((supervisor, index) => ({
-        ...supervisor,
         event_id: eventId,
+        supervisor_name: supervisor.supervisor_name,
+        phone: supervisor.phone?.trim() || null,
+        email: supervisor.email?.trim() || null,
         sort_order: index,
       }));
-
-      console.log('📝 Supervisors to insert:', supervisorsToInsert);
 
       const { data, error } = await supabase
         .from('supervisors')
         .insert(supervisorsToInsert)
         .select();
 
-      if (error) {
-        console.error('❌ Database error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-          fullError: error,
-        });
-        throw new Error(`Database error: ${error.message || 'Unknown error'} (Code: ${error.code || 'unknown'})`);
-      }
+      if (error) throw error;
 
       const newSupervisors = data.map(dbSupervisorToSupervisor);
       set((state) => ({
-        supervisors: [...state.supervisors, ...newSupervisors]
+        supervisors: [
+          ...state.supervisors.filter((supervisor) => supervisor.event_id !== eventId),
+          ...newSupervisors,
+        ],
       }));
     } catch (error) {
-      console.error('Error adding supervisors:', error);
+      console.error('Error replacing supervisors:', error);
+      throw error;
     }
   },
 

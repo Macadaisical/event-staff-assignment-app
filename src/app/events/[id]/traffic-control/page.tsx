@@ -30,9 +30,12 @@ export default function TrafficControlPage() {
   const {
     events,
     teamMembers,
-    addTrafficControls,
+    replaceTrafficControls,
     fetchEvents,
     fetchTeamMembers,
+    fetchTrafficControls,
+    getTrafficControls,
+    trafficControls: storeTrafficControls,
     isEventLoading,
     isTeamMembersLoading,
   } = useSupabaseStore();
@@ -54,11 +57,40 @@ export default function TrafficControlPage() {
   }, [teamMembers.length, fetchTeamMembers]);
 
   const event = events.find(e => e.event_id === params.id);
+  const eventId = event?.event_id;
   const activeMembers = teamMembers.filter(member => member.active);
 
   const [trafficControls, setTrafficControls] = useState<TrafficControlForm[]>([]);
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [hasInitialized, setHasInitialized] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!eventId) {
+      return;
+    }
+
+    fetchTrafficControls(eventId).catch((error: unknown) => {
+      console.error('Error loading traffic controls:', error);
+    });
+  }, [eventId, fetchTrafficControls]);
+
+  useEffect(() => {
+    if (!eventId || hasInitialized) {
+      return;
+    }
+
+    const existingControls = getTrafficControls(eventId);
+    if (existingControls.length) {
+      setTrafficControls(existingControls.map((control) => ({
+        member_id: control.member_id,
+        patrol_vehicle: control.patrol_vehicle || '',
+        area_assignment: control.area_assignment || '',
+      })));
+    }
+
+    setHasInitialized(true);
+  }, [eventId, getTrafficControls, hasInitialized, storeTrafficControls]);
 
   if (!event && (isEventLoading || events.length === 0)) {
     return (
@@ -179,36 +211,13 @@ export default function TrafficControlPage() {
   };
 
   const validateTrafficControls = (): boolean => {
-    const newErrors: {[key: string]: string} = {};
-
-    if (trafficControls.length === 0) {
-      newErrors.general = 'At least one traffic control assignment is required';
-      setErrors(newErrors);
-      return false;
-    }
+    const newErrors: { [key: string]: string } = {};
 
     trafficControls.forEach((control, index) => {
       if (!control.member_id) {
-        newErrors[`traffic_${index}_member_id`] = 'Team member is required';
-      }
-      if (!control.patrol_vehicle.trim()) {
-        newErrors[`traffic_${index}_patrol_vehicle`] = 'Patrol vehicle is required';
-      }
-      if (!control.area_assignment.trim()) {
-        newErrors[`traffic_${index}_area_assignment`] = 'Area assignment is required';
+        newErrors[`traffic_${index}_member_id`] = 'Deputy name is required';
       }
     });
-
-    // Check for duplicate member assignments
-    const memberIds = trafficControls.map(tc => tc.member_id).filter(Boolean);
-    const duplicates = memberIds.filter((id, index) => memberIds.indexOf(id) !== index);
-    if (duplicates.length > 0) {
-      trafficControls.forEach((control, index) => {
-        if (duplicates.includes(control.member_id)) {
-          newErrors[`traffic_${index}_member_id`] = 'This team member is already assigned to traffic control';
-        }
-      });
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -224,12 +233,12 @@ export default function TrafficControlPage() {
     try {
       const trafficControlsData = trafficControls.map((control, index) => ({
         member_id: control.member_id,
-        patrol_vehicle: control.patrol_vehicle.trim(),
-        area_assignment: control.area_assignment.trim(),
+        patrol_vehicle: control.patrol_vehicle.trim() || null,
+        area_assignment: control.area_assignment.trim() || null,
         sort_order: index + 1,
       }));
 
-      await addTrafficControls(event.event_id, trafficControlsData);
+      await replaceTrafficControls(event.event_id, trafficControlsData);
 
       // Small delay for user feedback
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -265,7 +274,7 @@ export default function TrafficControlPage() {
                 Traffic Control
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
-                {event.event_name} - {new Date(event.event_date).toLocaleDateString()}
+                {event.event_name} · {event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Date TBD'}
               </p>
             </div>
           </div>
@@ -282,18 +291,12 @@ export default function TrafficControlPage() {
       </div>
 
       {/* Error Message */}
-      {errors.general && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
-          <p className="text-red-600 dark:text-red-400">{errors.general}</p>
-        </div>
-      )}
-
       {/* Event Info Summary */}
       <div className="mb-6 bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-200 dark:border-orange-700">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div className="flex items-center text-orange-800 dark:text-orange-200">
             <Calendar className="h-4 w-4 mr-2" />
-            <span>{new Date(event.event_date).toLocaleDateString()}</span>
+            <span>{event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Date TBD'}</span>
           </div>
           <div className="flex items-center text-orange-800 dark:text-orange-200">
             <User className="h-4 w-4 mr-2" />

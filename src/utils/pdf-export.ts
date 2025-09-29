@@ -94,22 +94,39 @@ export function exportEventToPDF(data: PDFExportData): void {
     }
   };
 
+  const safeText = (value: string | null | undefined, fallback = 'Not specified'): string => {
+    if (!value) return fallback;
+    const trimmed = typeof value === 'string' ? value.trim() : value;
+    return trimmed.length ? trimmed : fallback;
+  };
+
+  const safeDate = (value: string | null | undefined): string => {
+    if (!value) return 'Date TBD';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? 'Date TBD' : parsed.toLocaleDateString();
+  };
+
+  const safeTimeRange = (start: string | null | undefined, end: string | null | undefined): string => {
+    if (!start && !end) return 'Time TBD';
+    return `${start || 'TBD'} – ${end || 'TBD'}`;
+  };
+
   // Document header
   addTitle('Event Staff Assignment Sheet');
 
   // Event Information
   addSection('Event Information');
-  addField('Event Name', event.event_name);
-  addField('Date', new Date(event.event_date).toLocaleDateString());
-  addField('Location', event.location);
-  addField('Event Time', `${event.start_time} - ${event.end_time}`);
-  addField('Team Meet Time', event.team_meet_time);
-  addField('Meet Location', event.meet_location);
-  addField('Prepared By', event.prepared_by);
-  addField('Date Prepared', new Date(event.prepared_date).toLocaleDateString());
+  addField('Event Name', safeText(event.event_name));
+  addField('Date', safeDate(event.event_date));
+  addField('Location', safeText(event.location));
+  addField('Event Time', safeTimeRange(event.start_time, event.end_time));
+  addField('Team Meet Time', safeText(event.team_meet_time, 'Time TBD'));
+  addField('Meet Location', safeText(event.meet_location));
+  addField('Prepared By', safeText(event.prepared_by));
+  addField('Date Prepared', safeDate(event.prepared_date));
 
   if (event.notes) {
-    addField('Notes', event.notes);
+    addField('Notes', safeText(event.notes));
   }
 
   // Supervisors
@@ -117,7 +134,7 @@ export function exportEventToPDF(data: PDFExportData): void {
   addSection('Supervisors');
   if (supervisors.length > 0) {
     supervisors.forEach((supervisor, index) => {
-      addField(`Supervisor ${index + 1}`, supervisor.supervisor_name);
+      addField(`Supervisor ${index + 1}`, safeText(supervisor.supervisor_name, 'Unnamed supervisor'));
     });
   } else {
     doc.setFontSize(10);
@@ -138,15 +155,15 @@ export function exportEventToPDF(data: PDFExportData): void {
     teamAssignments.forEach(assignment => {
       const member = teamMembers.find(m => m.member_id === assignment.member_id);
       const memberName = member ? member.member_name : 'Unknown Member';
-      const timeRange = `${assignment.start_time} - ${assignment.end_time}`;
+      const timeRange = safeTimeRange(assignment.start_time, assignment.end_time);
 
       checkPageBreak(15);
       addTableRow([
         memberName,
-        assignment.assignment_type,
-        assignment.equipment_area,
+        safeText(assignment.assignment_type, '—'),
+        safeText(assignment.equipment_area, '—'),
         timeRange,
-        assignment.notes || ''
+        safeText(assignment.notes, '—')
       ], assignmentWidths);
     });
   } else {
@@ -172,8 +189,8 @@ export function exportEventToPDF(data: PDFExportData): void {
       checkPageBreak(15);
       addTableRow([
         memberName,
-        traffic.patrol_vehicle,
-        traffic.area_assignment
+        safeText(traffic.patrol_vehicle, '—'),
+        safeText(traffic.area_assignment, '—')
       ], trafficWidths);
     });
   } else {
@@ -197,8 +214,9 @@ export function exportEventToPDF(data: PDFExportData): void {
   }
 
   // Generate filename and save
-  const eventDate = new Date(event.event_date).toISOString().split('T')[0];
-  const filename = `${event.event_name.replace(/[^a-zA-Z0-9]/g, '_')}_${eventDate}.pdf`;
+  const eventDate = event.event_date ? new Date(event.event_date).toISOString().split('T')[0] : 'undated';
+  const sanitizedName = safeText(event.event_name, 'event').replace(/[^a-zA-Z0-9]/g, '_');
+  const filename = `${sanitizedName}_${eventDate}.pdf`;
 
   doc.save(filename);
 }

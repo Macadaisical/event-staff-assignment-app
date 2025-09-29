@@ -5,12 +5,13 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth/auth-provider';
 import { useSupabaseStore } from '@/stores/supabase-store';
 import LoginForm from '@/components/auth/login-form';
-import { Plus, Calendar, MapPin, Clock } from 'lucide-react';
+import { Plus, Calendar, MapPin, Clock, Trash2 } from 'lucide-react';
 
 export default function EventsPage() {
   const { user, loading: authLoading } = useAuth();
-  const { events, fetchEvents } = useSupabaseStore();
+  const { events, fetchEvents, deleteEvent } = useSupabaseStore();
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -19,6 +20,23 @@ export default function EventsPage() {
       setLoading(false);
     }
   }, [user, authLoading, fetchEvents]);
+
+  const handleDeleteEvent = async (eventId: string, eventName: string) => {
+    if (!confirm(`Delete event "${eventName}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setDeletingId(eventId);
+      await deleteEvent(eventId);
+      await fetchEvents();
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      alert('Could not delete the event. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (authLoading || loading) {
     return <div className="flex justify-center p-8">Loading...</div>;
@@ -43,29 +61,37 @@ export default function EventsPage() {
 
       {events.length > 0 ? (
         <div className="grid gap-6">
-          {events.map((event) => (
-            <div
-              key={event.event_id}
-              className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                    {event.event_name}
-                  </h3>
+          {events.map((event) => {
+            const eventDate = event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Date TBD';
+            const timeRange =
+              event.start_time || event.end_time
+                ? `${event.start_time || 'TBD'} – ${event.end_time || 'TBD'}`
+                : 'Time TBD';
+            const location = event.location || 'Location TBD';
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400">
+            return (
+              <div
+                key={event.event_id}
+                className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                      {event.event_name}
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400">
                     <div className="flex items-center">
                       <Calendar className="h-4 w-4 mr-2" />
-                      {new Date(event.event_date).toLocaleDateString()}
+                      {eventDate}
                     </div>
                     <div className="flex items-center">
                       <Clock className="h-4 w-4 mr-2" />
-                      {event.start_time} - {event.end_time}
+                      {timeRange}
                     </div>
                     <div className="flex items-center">
                       <MapPin className="h-4 w-4 mr-2" />
-                      {event.location}
+                      {location}
                     </div>
                   </div>
 
@@ -89,10 +115,19 @@ export default function EventsPage() {
                   >
                     Edit
                   </Link>
+                  <button
+                    onClick={() => handleDeleteEvent(event.event_id, event.event_name)}
+                    disabled={deletingId === event.event_id}
+                    className="flex items-center justify-center px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    {deletingId === event.event_id ? 'Deleting...' : 'Delete'}
+                  </button>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-12">
