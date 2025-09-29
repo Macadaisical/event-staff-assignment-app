@@ -29,6 +29,31 @@ const DEFAULT_ASSIGNMENT_TYPE = 'General Support';
 const DEFAULT_EQUIPMENT_AREA = 'Assignment TBD';
 const DEFAULT_PATROL_VEHICLE = 'Vehicle TBD';
 const DEFAULT_AREA_ASSIGNMENT = 'Area TBD';
+const DEFAULT_ASSIGNMENT_CATEGORIES: AssignmentCategory[] = [
+  'Equipment Operator',
+  'Safety Monitor',
+  'Setup/Breakdown',
+  'Crowd Control',
+  'Communications',
+  'First Aid',
+  'General Support',
+  'Technical Support',
+];
+
+const normalizeCategoryName = (value: string): string => value.trim().replace(/\s+/g, ' ');
+const dedupeAndSortCategories = (categories: string[]): string[] => {
+  const unique: string[] = [];
+  categories.forEach((name) => {
+    const normalized = normalizeCategoryName(name);
+    if (!normalized) {
+      return;
+    }
+    if (!unique.some((existing) => existing.toLowerCase() === normalized.toLowerCase())) {
+      unique.push(normalized);
+    }
+  });
+  return unique.sort((a, b) => a.localeCompare(b));
+};
 
 const normalizeDbText = (value: string | null, fallback: string): string | null => {
   if (!value) return null;
@@ -151,6 +176,9 @@ interface SupabaseStore {
 
   // Assignment categories
   fetchAssignmentCategories: () => Promise<void>;
+  addAssignmentCategory: (categoryName: string) => Promise<void>;
+  updateAssignmentCategory: (currentName: string, updatedName: string) => Promise<void>;
+  deleteAssignmentCategory: (categoryName: string) => Promise<void>;
 
   // Loading states
   setIsEventLoading: (loading: boolean) => void;
@@ -165,16 +193,7 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   isEventLoading: false,
   teamMembers: [],
   isTeamMembersLoading: false,
-  assignmentCategories: [
-    'Equipment Operator',
-    'Safety Monitor',
-    'Setup/Breakdown',
-    'Crowd Control',
-    'Communications',
-    'First Aid',
-    'General Support',
-    'Technical Support',
-  ] as AssignmentCategory[],
+  assignmentCategories: [...DEFAULT_ASSIGNMENT_CATEGORIES],
   teamAssignments: [],
   trafficControls: [],
   supervisors: [],
@@ -766,25 +785,142 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   fetchAssignmentCategories: async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return; // Use defaults if not authenticated
+      if (!user) {
+        set({ assignmentCategories: [...DEFAULT_ASSIGNMENT_CATEGORIES] });
+        return;
+      }
 
       const { data, error } = await supabase
         .from('assignment_categories')
-        .select('*')
+        .select('category_name')
         .eq('user_id', user.id)
         .order('category_name');
 
       if (error) throw error;
 
-      if (data.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const categories = data.map((cat: any) => cat.category_name as AssignmentCategory);
-        set({ assignmentCategories: categories });
+      if (!data || data.length === 0) {
+        set({ assignmentCategories: [...DEFAULT_ASSIGNMENT_CATEGORIES] });
+        return;
       }
+
+      const categories = dedupeAndSortCategories(
+        data.map((cat) => cat.category_name as AssignmentCategory),
+      );
+
+      set({ assignmentCategories: categories });
     } catch (error) {
       console.error('Error fetching assignment categories:', error);
-      // Keep default categories on error
+      set({ assignmentCategories: [...DEFAULT_ASSIGNMENT_CATEGORIES] });
     }
+  },
+
+  addAssignmentCategory: async (categoryName) => {
+    const normalizedName = normalizeCategoryName(categoryName);
+    if (!normalizedName) {
+      throw new Error('Category name is required');
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { error } = await supabase
+      .from('assignment_categories')
+      .insert({
+        user_id: user.id,
+        category_name: normalizedName,
+      })
+      .select('category_name')
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('Category already exists.');
+      }
+      throw error;
+    }
+
+    set((state) => ({
+      assignmentCategories: dedupeAndSortCategories([
+        ...state.assignmentCategories,
+        normalizedName,
+      ]),
+    }));
+  },
+
+  updateAssignmentCategory: async (currentName, updatedName) => {
+    const existingName = normalizeCategoryName(currentName);
+    const normalizedName = normalizeCategoryName(updatedName);
+
+    if (!normalizedName) {
+      throw new Error('Category name is required');
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    const shouldPersist = existingName !== normalizedName;
+
+    if (shouldPersist) {
+      const { data, error } = await supabase
+        .from('assignment_categories')
+        .update({ category_name: normalizedName })
+        .eq('user_id', user.id)
+        .eq('category_name', existingName)
+        .select('category_name');
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Category already exists.');
+        }
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('Category not found.');
+      }
+    }
+
+    set((state) => ({
+      assignmentCategories: dedupeAndSortCategories(
+        state.assignmentCategories.map((name) =>
+          name.toLowerCase() === existingName.toLowerCase() ? normalizedName : name,
+        ),
+      ),
+    }));
+  },
+
+  deleteAssignmentCategory: async (categoryName) => {
+    const normalizedName = normalizeCategoryName(categoryName);
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { error } = await supabase
+      .from('assignment_categories')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('category_name', normalizedName);
+
+    if (error) {
+      throw error;
+    }
+
+    set((state) => {
+      const remaining = state.assignmentCategories.filter(
+        (name) => name.toLowerCase() !== normalizedName.toLowerCase(),
+      );
+      return {
+        assignmentCategories: remaining.length
+          ? dedupeAndSortCategories(remaining)
+          : [...DEFAULT_ASSIGNMENT_CATEGORIES],
+      };
+    });
   },
 
   // Loading states

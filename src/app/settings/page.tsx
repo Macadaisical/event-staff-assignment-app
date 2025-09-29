@@ -2,12 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { useSupabaseStore } from '@/stores/supabase-store';
-import { Settings, Plus, X, Edit2, Trash2 } from 'lucide-react';
+import { Settings, Plus, X, Edit2, Trash2, Check } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { assignmentCategories, fetchAssignmentCategories } = useSupabaseStore();
+  const {
+    assignmentCategories,
+    fetchAssignmentCategories,
+    addAssignmentCategory,
+    updateAssignmentCategory,
+    deleteAssignmentCategory,
+  } = useSupabaseStore();
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
 
   useEffect(() => {
     fetchAssignmentCategories().catch((error: unknown) => {
@@ -15,11 +25,76 @@ export default function SettingsPage() {
     });
   }, [fetchAssignmentCategories]);
 
-  const handleAddCategory = () => {
-    if (newCategoryName.trim()) {
-      // TODO: Implement add category functionality
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) {
+      return;
+    }
+
+    setIsSavingCategory(true);
+    setCategoryError(null);
+
+    try {
+      await addAssignmentCategory(newCategoryName);
       setNewCategoryName('');
       setIsAddingCategory(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to add category.';
+      setCategoryError(message);
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const startEditingCategory = (category: string) => {
+    setEditingCategory(category);
+    setEditingName(category);
+    setCategoryError(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingCategory(null);
+    setEditingName('');
+  };
+
+  const handleUpdateCategory = async () => {
+    if (!editingCategory) {
+      return;
+    }
+
+    if (!editingName.trim()) {
+      setCategoryError('Category name is required.');
+      return;
+    }
+
+    setIsSavingCategory(true);
+    setCategoryError(null);
+
+    try {
+      await updateAssignmentCategory(editingCategory, editingName);
+      cancelEditing();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update category.';
+      setCategoryError(message);
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (category: string) => {
+    if (!confirm(`Delete category "${category}"? This cannot be undone.`)) {
+      return;
+    }
+
+    setCategoryError(null);
+
+    try {
+      await deleteAssignmentCategory(category);
+      if (editingCategory === category) {
+        cancelEditing();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete category.';
+      setCategoryError(message);
     }
   };
 
@@ -37,13 +112,23 @@ export default function SettingsPage() {
             Assignment Categories
           </h3>
           <button
-            onClick={() => setIsAddingCategory(true)}
+            onClick={() => {
+              setIsAddingCategory(true);
+              setCategoryError(null);
+              setNewCategoryName('');
+            }}
             className="inline-flex items-center px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-3 w-3 mr-1" />
             Add Category
           </button>
         </div>
+
+        {categoryError && (
+          <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {categoryError}
+          </div>
+        )}
 
         {/* Add Category Form */}
         {isAddingCategory && (
@@ -60,10 +145,10 @@ export default function SettingsPage() {
               />
               <button
                 onClick={handleAddCategory}
-                disabled={!newCategoryName.trim()}
+                disabled={!newCategoryName.trim() || isSavingCategory}
                 className="px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
               >
-                Add
+                {isSavingCategory ? 'Saving...' : 'Add'}
               </button>
               <button
                 onClick={() => {
@@ -79,20 +164,53 @@ export default function SettingsPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {assignmentCategories.map((category, index) => (
+          {assignmentCategories.map((category) => (
             <div
-              key={index}
+              key={category}
               className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-600 rounded-lg"
             >
-              <span className="text-gray-900 dark:text-white">{category}</span>
-              <div className="flex items-center space-x-1">
-                <button className="p-1 text-gray-500 hover:text-gray-700">
-                  <Edit2 className="h-3 w-3" />
-                </button>
-                <button className="p-1 text-red-500 hover:text-red-700">
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              </div>
+              {editingCategory === category ? (
+                <div className="flex w-full items-center space-x-2">
+                  <input
+                    type="text"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleUpdateCategory()}
+                    className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                  <button
+                    onClick={handleUpdateCategory}
+                    disabled={isSavingCategory}
+                    className="inline-flex items-center rounded bg-green-600 px-2 py-2 text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <Check className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={cancelEditing}
+                    className="inline-flex items-center rounded bg-gray-500 px-2 py-2 text-white hover:bg-gray-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="text-gray-900 dark:text-white">{category}</span>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => startEditingCategory(category)}
+                      className="p-1 text-gray-500 hover:text-gray-700"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(category)}
+                      className="p-1 text-red-500 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
