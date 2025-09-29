@@ -70,6 +70,7 @@ const dbSupervisorToSupervisor = (dbSupervisor: SupervisorRow): Supervisor => ({
   supervisor_name: dbSupervisor.supervisor_name,
   phone: dbSupervisor.phone,
   email: dbSupervisor.email,
+  sort_order: dbSupervisor.sort_order ?? null,
 });
 
 interface SupabaseStore {

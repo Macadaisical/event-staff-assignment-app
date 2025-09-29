@@ -48,6 +48,7 @@ export interface Supervisor {
   supervisor_name: string;
   phone: string | null;
   email: string | null;
+  sort_order?: number | null;
 }
 
 // UI-specific types
