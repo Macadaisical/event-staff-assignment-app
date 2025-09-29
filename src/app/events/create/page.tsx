@@ -131,16 +131,16 @@ export default function CreateEventPage() {
 
     setIsSubmitting(true);
 
-    try {
+  try {
       const eventPayload = {
         event_name: formData.event_name.trim(),
         event_date: formData.event_date || null,
-        location: formData.location.trim() || null,
+        location: formData.location?.trim() || null,
         start_time: formData.start_time || null,
         end_time: formData.end_time || null,
         team_meet_time: formData.team_meet_time || null,
-        meet_location: formData.meet_location.trim() || null,
-        prepared_by: formData.prepared_by.trim() || null,
+        meet_location: formData.meet_location?.trim() || null,
+        prepared_by: formData.prepared_by?.trim() || null,
         prepared_date: formData.prepared_date || null,
         notes: formData.notes?.trim() || undefined,
       } as const;
@@ -317,7 +317,7 @@ export default function CreateEventPage() {
             <FormField label="Event Date" error={errors.event_date}>
               <Input
                 type="date"
-                value={formData.event_date}
+                value={formData.event_date || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, event_date: e.target.value }))}
                 error={!!errors.event_date}
               />
@@ -325,7 +325,7 @@ export default function CreateEventPage() {
 
             <FormField label="Location" error={errors.location}>
               <Input
-                value={formData.location}
+                value={formData.location || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
                 placeholder="123 Main St"
                 error={!!errors.location}
@@ -337,7 +337,7 @@ export default function CreateEventPage() {
                 <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
                   type="time"
-                  value={formData.start_time}
+                  value={formData.start_time || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
                   className="pl-10"
                   error={!!errors.start_time}
@@ -350,7 +350,7 @@ export default function CreateEventPage() {
                 <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
                   type="time"
-                  value={formData.end_time}
+                  value={formData.end_time || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
                   className="pl-10"
                   error={!!errors.end_time}
@@ -363,7 +363,7 @@ export default function CreateEventPage() {
                 <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
                   type="time"
-                  value={formData.team_meet_time}
+                  value={formData.team_meet_time || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, team_meet_time: e.target.value }))}
                   className="pl-10"
                   error={!!errors.team_meet_time}
@@ -375,7 +375,7 @@ export default function CreateEventPage() {
               <div className="relative">
                 <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
-                  value={formData.meet_location}
+                  value={formData.meet_location || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, meet_location: e.target.value }))}
                   placeholder="Operations Center"
                   className="pl-10"
@@ -386,7 +386,7 @@ export default function CreateEventPage() {
 
             <FormField label="Prepared By" error={errors.prepared_by}>
               <Input
-                value={formData.prepared_by}
+                value={formData.prepared_by || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, prepared_by: e.target.value }))}
                 placeholder="Captain Rivera"
                 error={!!errors.prepared_by}
@@ -396,14 +396,14 @@ export default function CreateEventPage() {
             <FormField label="Date Prepared">
               <Input
                 type="date"
-                value={formData.prepared_date}
+                value={formData.prepared_date || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, prepared_date: e.target.value }))}
               />
             </FormField>
 
             <FormField label="Notes" className="md:col-span-2">
               <Textarea
-                value={formData.notes}
+                value={formData.notes || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
                 placeholder="Optional notes for the event"
                 rows={4}
