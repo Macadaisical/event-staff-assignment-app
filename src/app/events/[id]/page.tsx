@@ -139,9 +139,10 @@ export default function EventDetailPage() {
     );
   }
 
-  const getMemberName = (memberId: string): string => {
+  const getMemberName = (memberId: string | null | undefined): string => {
+    if (!memberId) return 'Not specified';
     const member = teamMembers.find((m) => m.member_id === memberId);
-    return member ? member.member_name : 'Unknown Member';
+    return member ? member.member_name : 'Not specified';
   };
 
   const handleExport = () => {
@@ -317,7 +318,7 @@ export default function EventDetailPage() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
               <thead className="bg-gray-50 dark:bg-gray-900/40">
                 <tr>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Deputy</th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Staff Member</th>
                   <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Patrol Vehicle</th>
                   <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Area Assignment</th>
                 </tr>
@@ -325,7 +326,9 @@ export default function EventDetailPage() {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {eventTraffic.map((control) => (
                   <tr key={control.traffic_id}>
-                    <td className="px-4 py-2 text-gray-800 dark:text-gray-200">{getMemberName(control.member_id)}</td>
+                    <td className="px-4 py-2 text-gray-800 dark:text-gray-200">
+                      {formatText(control.staff_name, getMemberName(control.member_id))}
+                    </td>
                     <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{formatText(control.patrol_vehicle, '—')}</td>
                     <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{formatText(control.area_assignment, '—')}</td>
                   </tr>

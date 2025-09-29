@@ -36,7 +36,8 @@ export interface TeamAssignment {
 export interface TrafficControl {
   traffic_id: string;
   event_id: string;
-  member_id: string;
+  member_id: string | null;
+  staff_name: string | null;
   patrol_vehicle: string | null;
   area_assignment: string | null;
   sort_order: number;

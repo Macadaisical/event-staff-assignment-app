@@ -183,8 +183,12 @@ export function exportEventToPDF(data: PDFExportData): void {
     addTableHeader(trafficHeaders, trafficWidths);
 
     trafficControls.forEach(traffic => {
-      const member = teamMembers.find(m => m.member_id === traffic.member_id);
-      const memberName = member ? member.member_name : 'Unknown Member';
+      const memberName = traffic.staff_name && traffic.staff_name.trim().length
+        ? traffic.staff_name.trim()
+        : (() => {
+            const member = teamMembers.find(m => m.member_id === traffic.member_id);
+            return member ? member.member_name : 'Not specified';
+          })();
 
       checkPageBreak(15);
       addTableRow([

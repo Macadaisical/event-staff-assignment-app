@@ -163,7 +163,8 @@ export interface Database {
         Row: {
           traffic_id: string;
           event_id: string;
-          member_id: string;
+          member_id: string | null;
+          staff_name: string | null;
           patrol_vehicle: string | null;
           area_assignment: string | null;
           sort_order: number;
@@ -173,7 +174,8 @@ export interface Database {
         Insert: {
           traffic_id?: string;
           event_id: string;
-          member_id: string;
+          member_id?: string | null;
+          staff_name?: string | null;
           patrol_vehicle?: string | null;
           area_assignment?: string | null;
           sort_order?: number;
@@ -183,7 +185,8 @@ export interface Database {
         Update: {
           traffic_id?: string;
           event_id?: string;
-          member_id?: string;
+          member_id?: string | null;
+          staff_name?: string | null;
           patrol_vehicle?: string | null;
           area_assignment?: string | null;
           sort_order?: number;

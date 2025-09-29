@@ -23,8 +23,7 @@ interface AssignmentFormState {
 }
 
 interface TrafficFormState {
-  member_id: string;
-  member_name: string;
+  staff_name: string;
   patrol_vehicle: string;
   area_assignment: string;
 }
@@ -97,12 +96,6 @@ export default function CreateEventPage() {
     [teamMembers],
   );
 
-  const findMemberByName = (name: string) => {
-    const normalized = name.trim().toLowerCase();
-    if (!normalized) return undefined;
-    return teamMembers.find((member) => member.member_name.trim().toLowerCase() === normalized);
-  };
-
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
 
@@ -113,6 +106,12 @@ export default function CreateEventPage() {
     if (!formData.event_date) {
       newErrors.event_date = 'Event date is required';
     }
+
+    trafficControls.forEach((control, index) => {
+      if (!control.staff_name.trim()) {
+        newErrors[`traffic_${index}_staff_name`] = 'Staff member is required';
+      }
+    });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -188,12 +187,13 @@ export default function CreateEventPage() {
         if (trafficControls.length) {
           const preparedTraffic = trafficControls
             .map((control, index) => ({
-              member_id: control.member_id,
-              patrol_vehicle: control.patrol_vehicle.trim(),
-              area_assignment: control.area_assignment.trim(),
+              member_id: null,
+              staff_name: control.staff_name.trim(),
+              patrol_vehicle: control.patrol_vehicle.trim() || null,
+              area_assignment: control.area_assignment.trim() || null,
               sort_order: index + 1,
             }))
-            .filter((control) => control.member_id);
+            .filter((control) => control.staff_name.length);
 
           if (preparedTraffic.length) {
             await addTrafficControls(eventId, preparedTraffic);
@@ -256,11 +256,19 @@ export default function CreateEventPage() {
   };
 
   const addTraffic = () => {
-    setTrafficControls((prev) => [...prev, { member_id: '', member_name: '', patrol_vehicle: '', area_assignment: '' }]);
+    setTrafficControls((prev) => [...prev, { staff_name: '', patrol_vehicle: '', area_assignment: '' }]);
   };
 
   const updateTraffic = (index: number, changes: Partial<TrafficFormState>) => {
     setTrafficControls((prev) => prev.map((traffic, i) => (i === index ? { ...traffic, ...changes } : traffic)));
+
+    if (changes.staff_name !== undefined && errors[`traffic_${index}_staff_name`]) {
+      setErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[`traffic_${index}_staff_name`];
+        return updated;
+      });
+    }
   };
 
   const removeTraffic = (index: number) => {
@@ -584,40 +592,22 @@ export default function CreateEventPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField label="Staff Member" required error={errors[`traffic_${index}_member_id`]}>
-                      {(() => {
-                        const datalistId = `traffic-members-${index}`;
-                        return (
-                          <>
-                            <Input
-                              value={control.member_name}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                const match = findMemberByName(value);
-                                updateTraffic(index, {
-                                  member_name: value,
-                                  member_id: match ? match.member_id : '',
-                                });
-                                if (errors[`traffic_${index}_member_id`]) {
-                                  setErrors((prev) => {
-                                    const updated = { ...prev };
-                                    delete updated[`traffic_${index}_member_id`];
-                                    return updated;
-                                  });
-                                }
-                              }}
-                              placeholder="Enter staff member"
-                              list={datalistId}
-                              error={!!errors[`traffic_${index}_member_id`]}
-                            />
-                            <datalist id={datalistId}>
-                              {teamMemberNameOptions.map((option) => (
-                                <option key={`${option.value}-${index}`} value={option.value} />
-                              ))}
-                            </datalist>
-                          </>
-                        );
-                      })()}
+                    <FormField label="Staff Member" required error={errors[`traffic_${index}_staff_name`]}>
+                      <Input
+                        value={control.staff_name}
+                        onChange={(e) => {
+                          updateTraffic(index, { staff_name: e.target.value });
+                          if (errors[`traffic_${index}_staff_name`]) {
+                            setErrors((prev) => {
+                              const updated = { ...prev };
+                              delete updated[`traffic_${index}_staff_name`];
+                              return updated;
+                            });
+                          }
+                        }}
+                        placeholder="Enter staff member"
+                        error={!!errors[`traffic_${index}_staff_name`]}
+                      />
                     </FormField>
 
                     <FormField label="Patrol Vehicle">

@@ -76,7 +76,8 @@ CREATE TABLE public.team_assignments (
 CREATE TABLE public.traffic_controls (
   traffic_id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   event_id UUID REFERENCES public.events(event_id) ON DELETE CASCADE,
-  member_id UUID REFERENCES public.team_members(member_id) ON DELETE CASCADE,
+  member_id UUID REFERENCES public.team_members(member_id) ON DELETE SET NULL,
+  staff_name TEXT NOT NULL,
   patrol_vehicle TEXT NOT NULL,
   area_assignment TEXT NOT NULL,
   sort_order INTEGER DEFAULT 1,

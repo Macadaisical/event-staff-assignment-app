@@ -90,7 +90,8 @@ const dbTeamAssignmentToTeamAssignment = (dbAssignment: TeamAssignmentRow): Team
 const dbTrafficControlToTrafficControl = (dbControl: TrafficControlRow): TrafficControl => ({
   traffic_id: dbControl.traffic_id,
   event_id: dbControl.event_id,
-  member_id: dbControl.member_id,
+  member_id: dbControl.member_id ?? null,
+  staff_name: dbControl.staff_name ?? null,
   patrol_vehicle: normalizeDbText(dbControl.patrol_vehicle, DEFAULT_PATROL_VEHICLE),
   area_assignment: normalizeDbText(dbControl.area_assignment, DEFAULT_AREA_ASSIGNMENT),
   sort_order: dbControl.sort_order,
@@ -584,19 +585,23 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const filteredControls = controlData.filter((control) => control.member_id);
+      const filteredControls = controlData.filter((control) => control.staff_name && control.staff_name.trim());
 
       if (!filteredControls.length) {
         return;
       }
 
-      const controlsToInsert = filteredControls.map((control, index) => ({
-        event_id: eventId,
-        member_id: control.member_id,
-        patrol_vehicle: prepareTextForDb(control.patrol_vehicle, DEFAULT_PATROL_VEHICLE),
-        area_assignment: prepareTextForDb(control.area_assignment, DEFAULT_AREA_ASSIGNMENT),
-        sort_order: control.sort_order ?? index + 1,
-      }));
+      const controlsToInsert = filteredControls.map((control, index) => {
+        const staffName = (control.staff_name ?? '').trim();
+        return {
+          event_id: eventId,
+          member_id: control.member_id ?? null,
+          staff_name: staffName,
+          patrol_vehicle: prepareTextForDb(control.patrol_vehicle, DEFAULT_PATROL_VEHICLE),
+          area_assignment: prepareTextForDb(control.area_assignment, DEFAULT_AREA_ASSIGNMENT),
+          sort_order: control.sort_order ?? index + 1,
+        };
+      });
 
       const { data, error } = await supabase
         .from('traffic_controls')
@@ -633,7 +638,7 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         return;
       }
 
-      const filteredControls = controlData.filter((control) => control.member_id);
+      const filteredControls = controlData.filter((control) => control.staff_name && control.staff_name.trim());
 
       if (!filteredControls.length) {
         set((state) => ({
@@ -642,13 +647,17 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         return;
       }
 
-      const controlsToInsert = filteredControls.map((control, index) => ({
-        event_id: eventId,
-        member_id: control.member_id,
-        patrol_vehicle: prepareTextForDb(control.patrol_vehicle, DEFAULT_PATROL_VEHICLE),
-        area_assignment: prepareTextForDb(control.area_assignment, DEFAULT_AREA_ASSIGNMENT),
-        sort_order: control.sort_order ?? index + 1,
-      }));
+      const controlsToInsert = filteredControls.map((control, index) => {
+        const staffName = (control.staff_name ?? '').trim();
+        return {
+          event_id: eventId,
+          member_id: control.member_id ?? null,
+          staff_name: staffName,
+          patrol_vehicle: prepareTextForDb(control.patrol_vehicle, DEFAULT_PATROL_VEHICLE),
+          area_assignment: prepareTextForDb(control.area_assignment, DEFAULT_AREA_ASSIGNMENT),
+          sort_order: control.sort_order ?? index + 1,
+        };
+      });
 
       const { data, error } = await supabase
         .from('traffic_controls')

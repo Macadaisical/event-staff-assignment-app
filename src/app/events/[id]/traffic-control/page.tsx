@@ -10,17 +10,14 @@ import {
   Car,
   Plus,
   Trash2,
-  User,
   ArrowLeft,
   Save,
-  AlertTriangle,
-  MapPin
+  MapPin,
 } from 'lucide-react';
 
 
 interface TrafficControlForm {
-  member_id: string;
-  member_name: string;
+  staff_name: string;
   patrol_vehicle: string;
   area_assignment: string;
 }
@@ -30,15 +27,12 @@ export default function TrafficControlPage() {
   const router = useRouter();
   const {
     events,
-    teamMembers,
     replaceTrafficControls,
     fetchEvents,
-    fetchTeamMembers,
     fetchTrafficControls,
     getTrafficControls,
     trafficControls: storeTrafficControls,
     isEventLoading,
-    isTeamMembersLoading,
   } = useSupabaseStore();
 
   useEffect(() => {
@@ -49,17 +43,8 @@ export default function TrafficControlPage() {
     }
   }, [events.length, fetchEvents]);
 
-  useEffect(() => {
-    if (!teamMembers.length) {
-      fetchTeamMembers().catch((error: unknown) => {
-        console.error('Error loading team members:', error);
-      });
-    }
-  }, [teamMembers.length, fetchTeamMembers]);
-
   const event = events.find(e => e.event_id === params.id);
   const eventId = event?.event_id;
-  const activeMembers = teamMembers.filter(member => member.active);
 
   const [trafficControls, setTrafficControls] = useState<TrafficControlForm[]>([]);
   const [hasInitialized, setHasInitialized] = useState(false);
@@ -83,35 +68,15 @@ export default function TrafficControlPage() {
 
     const existingControls = getTrafficControls(eventId);
     if (existingControls.length) {
-      setTrafficControls(existingControls.map((control) => {
-        const matchedMember = teamMembers.find((member) => member.member_id === control.member_id);
-        return {
-          member_id: control.member_id,
-          member_name: matchedMember?.member_name ?? '',
-          patrol_vehicle: control.patrol_vehicle || '',
-          area_assignment: control.area_assignment || '',
-        };
-      }));
+      setTrafficControls(existingControls.map((control) => ({
+        staff_name: control.staff_name ?? '',
+        patrol_vehicle: control.patrol_vehicle || '',
+        area_assignment: control.area_assignment || '',
+      })));
     }
 
     setHasInitialized(true);
-  }, [eventId, getTrafficControls, hasInitialized, storeTrafficControls, teamMembers]);
-
-  useEffect(() => {
-    if (!teamMembers.length) {
-      return;
-    }
-
-    setTrafficControls((prev) =>
-      prev.map((control) => {
-        if (!control.member_id || control.member_name) {
-          return control;
-        }
-        const matchedMember = teamMembers.find((member) => member.member_id === control.member_id);
-        return matchedMember ? { ...control, member_name: matchedMember.member_name } : control;
-      }),
-    );
-  }, [teamMembers]);
+  }, [eventId, getTrafficControls, hasInitialized, storeTrafficControls]);
 
   if (!event && (isEventLoading || events.length === 0)) {
     return (
@@ -145,58 +110,9 @@ export default function TrafficControlPage() {
     );
   }
 
-  if (!activeMembers.length && isTeamMembersLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading team members...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (activeMembers.length === 0) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <div className="flex items-center space-x-4">
-            <Link
-              href={`/events/${event.event_id}`}
-              className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Traffic Control
-            </h1>
-          </div>
-        </div>
-
-        <div className="text-center py-12">
-          <AlertTriangle className="h-16 w-16 text-yellow-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            No Active Team Members
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            You need to add active team members before creating traffic control assignments.
-          </p>
-          <Link
-            href="/team-members"
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Team Members
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   const addTrafficControl = () => {
     setTrafficControls(prev => [...prev, {
-      member_id: '',
-      member_name: '',
+      staff_name: '',
       patrol_vehicle: '',
       area_assignment: ''
     }]);
@@ -218,57 +134,26 @@ export default function TrafficControlPage() {
 
   const updateTrafficControl = (index: number, field: keyof TrafficControlForm, value: string) => {
     setTrafficControls((prev) =>
-      prev.map((control, i) => {
-        if (i !== index) return control;
-        if (field === 'member_name') {
-          const match = teamMembers.find(
-            (member) => member.member_name.trim().toLowerCase() === value.trim().toLowerCase(),
-          );
-          return {
-            ...control,
-            member_name: value,
-            member_id: match ? match.member_id : '',
-          };
-        }
-        return { ...control, [field]: value };
-      }),
+      prev.map((control, i) => (i === index ? { ...control, [field]: value } : control)),
     );
 
     // Clear field error when user starts typing
-    const keysToClear = [
-      `traffic_${index}_${field}`,
-      ...(field === 'member_name' ? [`traffic_${index}_member_id`] : []),
-    ];
-
-    setErrors((prev) => {
-      const updated = { ...prev };
-      let changed = false;
-      keysToClear.forEach((key) => {
-        if (updated[key]) {
-          delete updated[key];
-          changed = true;
-        }
+    const errorKey = `traffic_${index}_${field}`;
+    if (errors[errorKey]) {
+      setErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[errorKey];
+        return updated;
       });
-      return changed ? updated : prev;
-    });
+    }
   };
 
   const validateTrafficControls = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
     trafficControls.forEach((control, index) => {
-      const name = control.member_name.trim();
-      if (!name) {
-        newErrors[`traffic_${index}_member_id`] = 'Staff member is required';
-        return;
-      }
-
-      const match = teamMembers.find(
-        (member) => member.member_name.trim().toLowerCase() === name.toLowerCase(),
-      );
-
-      if (!match) {
-        newErrors[`traffic_${index}_member_id`] = 'Select a staff member from the team list';
+      if (!control.staff_name.trim()) {
+        newErrors[`traffic_${index}_staff_name`] = 'Staff member is required';
       }
     });
 
@@ -285,7 +170,8 @@ export default function TrafficControlPage() {
 
     try {
       const trafficControlsData = trafficControls.map((control, index) => ({
-        member_id: control.member_id,
+        member_id: null,
+        staff_name: control.staff_name.trim(),
         patrol_vehicle: control.patrol_vehicle.trim() || null,
         area_assignment: control.area_assignment.trim() || null,
         sort_order: index + 1,
@@ -341,15 +227,9 @@ export default function TrafficControlPage() {
       {/* Error Message */}
       {/* Event Info Summary */}
       <div className="mb-6 bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 border border-orange-200 dark:border-orange-700">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center text-orange-800 dark:text-orange-200">
-            <Calendar className="h-4 w-4 mr-2" />
-            <span>{event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Date TBD'}</span>
-          </div>
-          <div className="flex items-center text-orange-800 dark:text-orange-200">
-            <User className="h-4 w-4 mr-2" />
-            <span>{activeMembers.length} available team members</span>
-          </div>
+        <div className="flex items-center text-sm text-orange-800 dark:text-orange-200">
+          <Calendar className="h-4 w-4 mr-2" />
+          <span>{event.event_date ? new Date(event.event_date).toLocaleDateString() : 'Date TBD'}</span>
         </div>
       </div>
 
@@ -397,27 +277,14 @@ export default function TrafficControlPage() {
                 <FormField
                   label="Staff Member"
                   required
-                  error={errors[`traffic_${index}_member_id`]}
+                  error={errors[`traffic_${index}_staff_name`]}
                 >
-                  {(() => {
-                    const datalistId = `traffic-control-members-${index}`;
-                    return (
-                      <>
-                        <Input
-                          value={control.member_name}
-                          onChange={(e) => updateTrafficControl(index, 'member_name', e.target.value)}
-                          placeholder="Enter staff member"
-                          list={datalistId}
-                          error={!!errors[`traffic_${index}_member_id`]}
-                        />
-                        <datalist id={datalistId}>
-                          {activeMembers.map((member) => (
-                            <option key={`${member.member_id}-${index}`} value={member.member_name} />
-                          ))}
-                        </datalist>
-                      </>
-                    );
-                  })()}
+                  <Input
+                    value={control.staff_name}
+                    onChange={(e) => updateTrafficControl(index, 'staff_name', e.target.value)}
+                    placeholder="Enter staff member"
+                    error={!!errors[`traffic_${index}_staff_name`]}
+                  />
                 </FormField>
 
                 <FormField label="Patrol Vehicle">
