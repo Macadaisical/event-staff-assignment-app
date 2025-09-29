@@ -803,8 +803,9 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         return;
       }
 
+      const categoryRows = data as { category_name: string | null }[];
       const categories = dedupeAndSortCategories(
-        data.map((cat) => cat.category_name as AssignmentCategory),
+        categoryRows.map(({ category_name }) => category_name ?? ''),
       );
 
       set({ assignmentCategories: categories });
