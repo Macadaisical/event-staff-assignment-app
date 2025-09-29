@@ -100,69 +100,6 @@ export default function CreateEventPage() {
       newErrors.event_date = 'Event date is required';
     }
 
-    if (!formData.location || !formData.location.trim()) {
-      newErrors.location = 'Location is required';
-    }
-
-    if (!formData.start_time) {
-      newErrors.start_time = 'Start time is required';
-    }
-
-    if (!formData.end_time) {
-      newErrors.end_time = 'End time is required';
-    }
-
-    if (!formData.team_meet_time) {
-      newErrors.team_meet_time = 'Team meet time is required';
-    }
-
-    if (!formData.meet_location || !formData.meet_location.trim()) {
-      newErrors.meet_location = 'Meet location is required';
-    }
-
-    if (!formData.prepared_by || !formData.prepared_by.trim()) {
-      newErrors.prepared_by = 'Prepared by is required';
-    }
-
-    if (!formData.prepared_date) {
-      newErrors.prepared_date = 'Prepared date is required';
-    }
-
-    const validSupervisors = formData.supervisors.filter((s) => s.supervisor_name.trim());
-    if (!validSupervisors.length) {
-      newErrors.supervisors = 'At least one supervisor is required';
-    }
-
-    assignments.forEach((assignment, index) => {
-      if (!assignment.member_id) {
-        newErrors[`assignment_${index}_member_id`] = 'Team member is required';
-      }
-      if (!assignment.assignment_type.trim()) {
-        newErrors[`assignment_${index}_assignment_type`] = 'Assignment type is required';
-      }
-      if (!assignment.equipment_area.trim()) {
-        newErrors[`assignment_${index}_equipment_area`] = 'Equipment/area is required';
-      }
-      if (!assignment.start_time) {
-        newErrors[`assignment_${index}_start_time`] = 'Start time is required';
-      }
-      if (!assignment.end_time) {
-        newErrors[`assignment_${index}_end_time`] = 'End time is required';
-      }
-    });
-
-    trafficControls.forEach((control, index) => {
-      if (!control.member_id) {
-        newErrors[`traffic_${index}_member_id`] = 'Deputy name is required';
-      }
-      if (!control.patrol_vehicle.trim()) {
-        newErrors[`traffic_${index}_patrol_vehicle`] = 'Vehicle is required';
-      }
-      if (!control.area_assignment.trim()) {
-        newErrors[`traffic_${index}_area_assignment`] = 'Area assignment is required';
-      }
-    });
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -185,13 +122,13 @@ export default function CreateEventPage() {
       const eventPayload = {
         event_name: formData.event_name.trim(),
         event_date: formData.event_date,
-        location: (formData.location ?? '').trim(),
-        start_time: formData.start_time,
-        end_time: formData.end_time,
-        team_meet_time: formData.team_meet_time,
-        meet_location: (formData.meet_location ?? '').trim(),
-        prepared_by: (formData.prepared_by ?? '').trim(),
-        prepared_date: formData.prepared_date,
+        location: formData.location?.trim() || null,
+        start_time: formData.start_time || null,
+        end_time: formData.end_time || null,
+        team_meet_time: formData.team_meet_time || null,
+        meet_location: formData.meet_location?.trim() || null,
+        prepared_by: formData.prepared_by?.trim() || null,
+        prepared_date: formData.prepared_date || formData.event_date,
         notes: formData.notes?.trim() || null,
       } as const;
 
@@ -217,30 +154,36 @@ export default function CreateEventPage() {
         }
 
         if (assignments.length) {
-          await addTeamAssignments(
-            eventId,
-            assignments.map((assignment, index) => ({
+          const preparedAssignments = assignments
+            .map((assignment, index) => ({
               member_id: assignment.member_id,
               assignment_type: assignment.assignment_type.trim() || 'General Support',
               equipment_area: assignment.equipment_area.trim(),
-              start_time: assignment.start_time,
-              end_time: assignment.end_time,
+              start_time: assignment.start_time || null,
+              end_time: assignment.end_time || null,
               notes: assignment.notes?.trim() || null,
               sort_order: index + 1,
-            })),
-          );
+            }))
+            .filter((assignment) => assignment.member_id);
+
+          if (preparedAssignments.length) {
+            await addTeamAssignments(eventId, preparedAssignments);
+          }
         }
 
         if (trafficControls.length) {
-          await addTrafficControls(
-            eventId,
-            trafficControls.map((control, index) => ({
+          const preparedTraffic = trafficControls
+            .map((control, index) => ({
               member_id: control.member_id,
               patrol_vehicle: control.patrol_vehicle.trim(),
               area_assignment: control.area_assignment.trim(),
               sort_order: index + 1,
-            })),
-          );
+            }))
+            .filter((control) => control.member_id);
+
+          if (preparedTraffic.length) {
+            await addTrafficControls(eventId, preparedTraffic);
+          }
         }
       }
 
@@ -296,15 +239,6 @@ export default function CreateEventPage() {
 
   const removeAssignment = (index: number) => {
     setAssignments((prev) => prev.filter((_, i) => i !== index));
-    setErrors((prev) => {
-      const updated = { ...prev };
-      Object.keys(updated).forEach((key) => {
-        if (key.startsWith(`assignment_${index}_`)) {
-          delete updated[key];
-        }
-      });
-      return updated;
-    });
   };
 
   const addTraffic = () => {
@@ -317,15 +251,6 @@ export default function CreateEventPage() {
 
   const removeTraffic = (index: number) => {
     setTrafficControls((prev) => prev.filter((_, i) => i !== index));
-    setErrors((prev) => {
-      const updated = { ...prev };
-      Object.keys(updated).forEach((key) => {
-        if (key.startsWith(`traffic_${index}_`)) {
-          delete updated[key];
-        }
-      });
-      return updated;
-    });
   };
 
   return (
@@ -373,16 +298,15 @@ export default function CreateEventPage() {
               />
             </FormField>
 
-            <FormField label="Location" required error={errors.location}>
+            <FormField label="Location">
               <Input
                 value={formData.location || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
                 placeholder="123 Main St"
-                error={!!errors.location}
               />
             </FormField>
 
-            <FormField label="Start Time" required error={errors.start_time}>
+            <FormField label="Start Time">
               <div className="relative">
                 <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
@@ -390,12 +314,11 @@ export default function CreateEventPage() {
                   value={formData.start_time || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
                   className="pl-10"
-                  error={!!errors.start_time}
                 />
               </div>
             </FormField>
 
-            <FormField label="End Time" required error={errors.end_time}>
+            <FormField label="End Time">
               <div className="relative">
                 <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
@@ -403,12 +326,11 @@ export default function CreateEventPage() {
                   value={formData.end_time || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
                   className="pl-10"
-                  error={!!errors.end_time}
                 />
               </div>
             </FormField>
 
-            <FormField label="Team Meet Time" required error={errors.team_meet_time}>
+            <FormField label="Team Meet Time">
               <div className="relative">
                 <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
@@ -416,12 +338,11 @@ export default function CreateEventPage() {
                   value={formData.team_meet_time || ''}
                   onChange={(e) => setFormData((prev) => ({ ...prev, team_meet_time: e.target.value }))}
                   className="pl-10"
-                  error={!!errors.team_meet_time}
                 />
               </div>
             </FormField>
 
-            <FormField label="Meet Location" required error={errors.meet_location}>
+            <FormField label="Meet Location">
               <div className="relative">
                 <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <Input
@@ -429,26 +350,23 @@ export default function CreateEventPage() {
                   onChange={(e) => setFormData((prev) => ({ ...prev, meet_location: e.target.value }))}
                   placeholder="Operations Center"
                   className="pl-10"
-                  error={!!errors.meet_location}
                 />
               </div>
             </FormField>
 
-            <FormField label="Prepared By" required error={errors.prepared_by}>
+            <FormField label="Prepared By">
               <Input
                 value={formData.prepared_by || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, prepared_by: e.target.value }))}
                 placeholder="Captain Rivera"
-                error={!!errors.prepared_by}
               />
             </FormField>
 
-            <FormField label="Date Prepared" required error={errors.prepared_date}>
+            <FormField label="Date Prepared">
               <Input
                 type="date"
                 value={formData.prepared_date || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, prepared_date: e.target.value }))}
-                error={!!errors.prepared_date}
               />
             </FormField>
 
@@ -479,10 +397,6 @@ export default function CreateEventPage() {
               Add Supervisor
             </button>
           </div>
-
-          {errors.supervisors && (
-            <p className="text-sm text-red-600 dark:text-red-400 mb-4">{errors.supervisors}</p>
-          )}
 
           <div className="space-y-4">
             {formData.supervisors.map((supervisor, index) => (
@@ -548,115 +462,55 @@ export default function CreateEventPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <FormField
-                      label="Team Member"
-                      required
-                      error={errors[`assignment_${index}_member_id`]}
-                    >
+                    <FormField label="Team Member">
                       <Select
                         value={assignment.member_id}
                         onChange={(e) => {
                           updateAssignment(index, { member_id: e.target.value });
-                          if (errors[`assignment_${index}_member_id`]) {
-                            setErrors((prev) => {
-                              const updated = { ...prev };
-                              delete updated[`assignment_${index}_member_id`];
-                              return updated;
-                            });
-                          }
                         }}
                         options={assignmentMemberOptions}
                         placeholder="Select team member"
-                        error={!!errors[`assignment_${index}_member_id`]}
                       />
                     </FormField>
 
-                    <FormField
-                      label="Assignment Type"
-                      required
-                      error={errors[`assignment_${index}_assignment_type`]}
-                    >
+                    <FormField label="Assignment Type">
                       <Select
                         value={assignment.assignment_type}
                         onChange={(e) => {
                           updateAssignment(index, { assignment_type: e.target.value });
-                          if (errors[`assignment_${index}_assignment_type`]) {
-                            setErrors((prev) => {
-                              const updated = { ...prev };
-                              delete updated[`assignment_${index}_assignment_type`];
-                              return updated;
-                            });
-                          }
                         }}
                         options={assignmentCategoryOptions}
                         placeholder="Select assignment type"
-                        error={!!errors[`assignment_${index}_assignment_type`]}
                       />
                     </FormField>
 
-                    <FormField
-                      label="Equipment / Area"
-                      required
-                      error={errors[`assignment_${index}_equipment_area`]}
-                    >
+                    <FormField label="Equipment / Area">
                       <Input
                         value={assignment.equipment_area}
                         onChange={(e) => {
                           updateAssignment(index, { equipment_area: e.target.value });
-                          if (errors[`assignment_${index}_equipment_area`]) {
-                            setErrors((prev) => {
-                              const updated = { ...prev };
-                              delete updated[`assignment_${index}_equipment_area`];
-                              return updated;
-                            });
-                          }
                         }}
                         placeholder="Stage Left, Radios"
-                        error={!!errors[`assignment_${index}_equipment_area`]}
                       />
                     </FormField>
 
-                    <FormField
-                      label="Start Time"
-                      required
-                      error={errors[`assignment_${index}_start_time`]}
-                    >
+                    <FormField label="Start Time">
                       <Input
                         type="time"
                         value={assignment.start_time}
                         onChange={(e) => {
                           updateAssignment(index, { start_time: e.target.value });
-                          if (errors[`assignment_${index}_start_time`]) {
-                            setErrors((prev) => {
-                              const updated = { ...prev };
-                              delete updated[`assignment_${index}_start_time`];
-                              return updated;
-                            });
-                          }
                         }}
-                        error={!!errors[`assignment_${index}_start_time`]}
                       />
                     </FormField>
 
-                    <FormField
-                      label="End Time"
-                      required
-                      error={errors[`assignment_${index}_end_time`]}
-                    >
+                    <FormField label="End Time">
                       <Input
                         type="time"
                         value={assignment.end_time}
                         onChange={(e) => {
                           updateAssignment(index, { end_time: e.target.value });
-                          if (errors[`assignment_${index}_end_time`]) {
-                            setErrors((prev) => {
-                              const updated = { ...prev };
-                              delete updated[`assignment_${index}_end_time`];
-                              return updated;
-                            });
-                          }
                         }}
-                        error={!!errors[`assignment_${index}_end_time`]}
                       />
                     </FormField>
 
@@ -714,70 +568,34 @@ export default function CreateEventPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField
-                      label="Deputy"
-                      required
-                      error={errors[`traffic_${index}_member_id`]}
-                    >
+                    <FormField label="Deputy">
                       <Select
                         value={control.member_id}
                         onChange={(e) => {
                           updateTraffic(index, { member_id: e.target.value });
-                          if (errors[`traffic_${index}_member_id`]) {
-                            setErrors((prev) => {
-                              const updated = { ...prev };
-                              delete updated[`traffic_${index}_member_id`];
-                              return updated;
-                            });
-                          }
                         }}
                         options={trafficMemberOptions}
                         placeholder="Select deputy"
-                        error={!!errors[`traffic_${index}_member_id`]}
                       />
                     </FormField>
 
-                    <FormField
-                      label="Patrol Vehicle"
-                      required
-                      error={errors[`traffic_${index}_patrol_vehicle`]}
-                    >
+                    <FormField label="Patrol Vehicle">
                       <Input
                         value={control.patrol_vehicle}
                         onChange={(e) => {
                           updateTraffic(index, { patrol_vehicle: e.target.value });
-                          if (errors[`traffic_${index}_patrol_vehicle`]) {
-                            setErrors((prev) => {
-                              const updated = { ...prev };
-                              delete updated[`traffic_${index}_patrol_vehicle`];
-                              return updated;
-                            });
-                          }
                         }}
                         placeholder="Unit 5"
-                        error={!!errors[`traffic_${index}_patrol_vehicle`]}
                       />
                     </FormField>
 
-                    <FormField
-                      label="Area Assignment"
-                      required
-                      error={errors[`traffic_${index}_area_assignment`]}
-                    >
+                    <FormField label="Area Assignment">
                       <Input
                         value={control.area_assignment}
                         onChange={(e) => {
                           updateTraffic(index, { area_assignment: e.target.value });
-                          if (errors[`traffic_${index}_area_assignment`]) {
-                            setErrors((prev) => {
-                              const updated = { ...prev };
-                              delete updated[`traffic_${index}_area_assignment`];
-                              return updated;
-                            });
-                          }
                         }}
                         placeholder="North Lot"
-                        error={!!errors[`traffic_${index}_area_assignment`]}
                       />
                     </FormField>
                   </div>

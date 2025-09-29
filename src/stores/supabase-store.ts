@@ -21,17 +21,49 @@ type TeamAssignmentRow = Database['public']['Tables']['team_assignments']['Row']
 type TrafficControlRow = Database['public']['Tables']['traffic_controls']['Row'];
 type SupervisorRow = Database['public']['Tables']['supervisors']['Row'];
 
+const DEFAULT_LOCATION = 'Location TBD';
+const DEFAULT_MEET_LOCATION = 'Meet TBD';
+const DEFAULT_PREPARED_BY = 'Unassigned';
+const DEFAULT_TIME = '00:00';
+const DEFAULT_ASSIGNMENT_TYPE = 'General Support';
+const DEFAULT_EQUIPMENT_AREA = 'Assignment TBD';
+const DEFAULT_PATROL_VEHICLE = 'Vehicle TBD';
+const DEFAULT_AREA_ASSIGNMENT = 'Area TBD';
+
+const normalizeDbText = (value: string | null, fallback: string): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed === fallback ? null : trimmed;
+};
+
+const normalizeDbTime = (value: string | null): string | null => {
+  if (!value) return null;
+  return value === '00:00' || value === '00:00:00' ? null : value;
+};
+
+const prepareTextForDb = (value: string | null | undefined, fallback: string): string => {
+  if (!value) return fallback;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : fallback;
+};
+
+const prepareTimeForDb = (value: string | null | undefined, fallback: string = DEFAULT_TIME): string => {
+  if (!value) return fallback;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : fallback;
+};
+
 // Conversion functions from database rows to app types
 const dbEventToEvent = (dbEvent: EventRow): Event => ({
   event_id: dbEvent.event_id,
   event_name: dbEvent.event_name,
   event_date: dbEvent.event_date,
-  location: dbEvent.location,
-  start_time: dbEvent.start_time,
-  end_time: dbEvent.end_time,
-  team_meet_time: dbEvent.team_meet_time,
-  meet_location: dbEvent.meet_location,
-  prepared_by: dbEvent.prepared_by,
+  location: normalizeDbText(dbEvent.location, DEFAULT_LOCATION),
+  start_time: normalizeDbTime(dbEvent.start_time),
+  end_time: normalizeDbTime(dbEvent.end_time),
+  team_meet_time: normalizeDbTime(dbEvent.team_meet_time),
+  meet_location: normalizeDbText(dbEvent.meet_location, DEFAULT_MEET_LOCATION),
+  prepared_by: normalizeDbText(dbEvent.prepared_by, DEFAULT_PREPARED_BY),
   prepared_date: dbEvent.prepared_date,
   notes: dbEvent.notes,
   created_at: dbEvent.created_at,
@@ -48,9 +80,9 @@ const dbTeamAssignmentToTeamAssignment = (dbAssignment: TeamAssignmentRow): Team
   event_id: dbAssignment.event_id,
   member_id: dbAssignment.member_id,
   assignment_type: dbAssignment.assignment_type,
-  equipment_area: dbAssignment.equipment_area,
-  start_time: dbAssignment.start_time,
-  end_time: dbAssignment.end_time,
+  equipment_area: normalizeDbText(dbAssignment.equipment_area, DEFAULT_EQUIPMENT_AREA),
+  start_time: normalizeDbTime(dbAssignment.start_time),
+  end_time: normalizeDbTime(dbAssignment.end_time),
   notes: dbAssignment.notes,
   sort_order: dbAssignment.sort_order,
 });
@@ -59,8 +91,8 @@ const dbTrafficControlToTrafficControl = (dbControl: TrafficControlRow): Traffic
   traffic_id: dbControl.traffic_id,
   event_id: dbControl.event_id,
   member_id: dbControl.member_id,
-  patrol_vehicle: dbControl.patrol_vehicle,
-  area_assignment: dbControl.area_assignment,
+  patrol_vehicle: normalizeDbText(dbControl.patrol_vehicle, DEFAULT_PATROL_VEHICLE),
+  area_assignment: normalizeDbText(dbControl.area_assignment, DEFAULT_AREA_ASSIGNMENT),
   sort_order: dbControl.sort_order,
 });
 
@@ -178,7 +210,16 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       console.log('👤 User authenticated:', user.id);
 
       const insertData = {
-        ...eventData,
+        event_name: eventData.event_name.trim(),
+        event_date: eventData.event_date,
+        location: prepareTextForDb(eventData.location, DEFAULT_LOCATION),
+        start_time: prepareTimeForDb(eventData.start_time),
+        end_time: prepareTimeForDb(eventData.end_time),
+        team_meet_time: prepareTimeForDb(eventData.team_meet_time ?? eventData.start_time),
+        meet_location: prepareTextForDb(eventData.meet_location, DEFAULT_MEET_LOCATION),
+        prepared_by: prepareTextForDb(eventData.prepared_by, DEFAULT_PREPARED_BY),
+        prepared_date: eventData.prepared_date || eventData.event_date,
+        notes: eventData.notes?.trim() || null,
         user_id: user.id,
       };
       console.log('📝 Insert data:', insertData);
@@ -222,16 +263,16 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { error } = await supabase
         .from('events')
         .update({
-          event_name: event.event_name,
+          event_name: event.event_name.trim(),
           event_date: event.event_date,
-          location: event.location,
-          start_time: event.start_time,
-          end_time: event.end_time,
-          team_meet_time: event.team_meet_time,
-          meet_location: event.meet_location,
-          prepared_by: event.prepared_by,
-          prepared_date: event.prepared_date,
-          notes: event.notes,
+          location: prepareTextForDb(event.location, DEFAULT_LOCATION),
+          start_time: prepareTimeForDb(event.start_time),
+          end_time: prepareTimeForDb(event.end_time),
+          team_meet_time: prepareTimeForDb(event.team_meet_time ?? event.start_time),
+          meet_location: prepareTextForDb(event.meet_location, DEFAULT_MEET_LOCATION),
+          prepared_by: prepareTextForDb(event.prepared_by, DEFAULT_PREPARED_BY),
+          prepared_date: event.prepared_date || event.event_date,
+          notes: event.notes?.trim() || null,
         })
         .eq('event_id', event.event_id)
         .eq('user_id', user.id);
@@ -415,13 +456,19 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const assignmentsToInsert = assignmentData.map((assignment, index) => ({
+      const filteredAssignments = assignmentData.filter((assignment) => assignment.member_id);
+
+      if (!filteredAssignments.length) {
+        return;
+      }
+
+      const assignmentsToInsert = filteredAssignments.map((assignment, index) => ({
         event_id: eventId,
         member_id: assignment.member_id,
-        assignment_type: assignment.assignment_type || null,
-        equipment_area: assignment.equipment_area?.trim() || null,
-        start_time: assignment.start_time || null,
-        end_time: assignment.end_time || null,
+        assignment_type: prepareTextForDb(assignment.assignment_type, DEFAULT_ASSIGNMENT_TYPE),
+        equipment_area: prepareTextForDb(assignment.equipment_area, DEFAULT_EQUIPMENT_AREA),
+        start_time: prepareTimeForDb(assignment.start_time),
+        end_time: prepareTimeForDb(assignment.end_time),
         notes: assignment.notes?.trim() || null,
         sort_order: assignment.sort_order ?? index + 1,
       }));
@@ -461,14 +508,23 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         return;
       }
 
-      const assignmentsToInsert = assignmentData.map((assignment, index) => ({
+      const filteredAssignments = assignmentData.filter((assignment) => assignment.member_id);
+
+      if (!filteredAssignments.length) {
+        set((state) => ({
+          teamAssignments: state.teamAssignments.filter(a => a.event_id !== eventId),
+        }));
+        return;
+      }
+
+      const assignmentsToInsert = filteredAssignments.map((assignment, index) => ({
         event_id: eventId,
         member_id: assignment.member_id,
-        assignment_type: assignment.assignment_type || null,
-        equipment_area: assignment.equipment_area || null,
-        start_time: assignment.start_time || null,
-        end_time: assignment.end_time || null,
-        notes: assignment.notes || null,
+        assignment_type: prepareTextForDb(assignment.assignment_type, DEFAULT_ASSIGNMENT_TYPE),
+        equipment_area: prepareTextForDb(assignment.equipment_area, DEFAULT_EQUIPMENT_AREA),
+        start_time: prepareTimeForDb(assignment.start_time),
+        end_time: prepareTimeForDb(assignment.end_time),
+        notes: assignment.notes?.trim() || null,
         sort_order: assignment.sort_order ?? index + 1,
       }));
 
@@ -528,11 +584,17 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const controlsToInsert = controlData.map((control, index) => ({
+      const filteredControls = controlData.filter((control) => control.member_id);
+
+      if (!filteredControls.length) {
+        return;
+      }
+
+      const controlsToInsert = filteredControls.map((control, index) => ({
         event_id: eventId,
         member_id: control.member_id,
-        patrol_vehicle: control.patrol_vehicle?.trim() || null,
-        area_assignment: control.area_assignment?.trim() || null,
+        patrol_vehicle: prepareTextForDb(control.patrol_vehicle, DEFAULT_PATROL_VEHICLE),
+        area_assignment: prepareTextForDb(control.area_assignment, DEFAULT_AREA_ASSIGNMENT),
         sort_order: control.sort_order ?? index + 1,
       }));
 
@@ -571,11 +633,20 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         return;
       }
 
-      const controlsToInsert = controlData.map((control, index) => ({
+      const filteredControls = controlData.filter((control) => control.member_id);
+
+      if (!filteredControls.length) {
+        set((state) => ({
+          trafficControls: state.trafficControls.filter(c => c.event_id !== eventId),
+        }));
+        return;
+      }
+
+      const controlsToInsert = filteredControls.map((control, index) => ({
         event_id: eventId,
         member_id: control.member_id,
-        patrol_vehicle: control.patrol_vehicle || null,
-        area_assignment: control.area_assignment || null,
+        patrol_vehicle: prepareTextForDb(control.patrol_vehicle, DEFAULT_PATROL_VEHICLE),
+        area_assignment: prepareTextForDb(control.area_assignment, DEFAULT_AREA_ASSIGNMENT),
         sort_order: control.sort_order ?? index + 1,
       }));
 
