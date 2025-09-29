@@ -24,6 +24,7 @@ interface AssignmentFormState {
 
 interface TrafficFormState {
   member_id: string;
+  member_name: string;
   patrol_vehicle: string;
   area_assignment: string;
 }
@@ -87,7 +88,20 @@ export default function CreateEventPage() {
     return unique.map((category) => ({ value: category, label: category }));
   }, [assignmentCategories]);
 
-  const trafficMemberOptions = assignmentMemberOptions;
+  const teamMemberNameOptions = useMemo(
+    () =>
+      teamMembers.map((member) => ({
+        value: member.member_name,
+        label: member.member_name,
+      })),
+    [teamMembers],
+  );
+
+  const findMemberByName = (name: string) => {
+    const normalized = name.trim().toLowerCase();
+    if (!normalized) return undefined;
+    return teamMembers.find((member) => member.member_name.trim().toLowerCase() === normalized);
+  };
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -242,7 +256,7 @@ export default function CreateEventPage() {
   };
 
   const addTraffic = () => {
-    setTrafficControls((prev) => [...prev, { member_id: '', patrol_vehicle: '', area_assignment: '' }]);
+    setTrafficControls((prev) => [...prev, { member_id: '', member_name: '', patrol_vehicle: '', area_assignment: '' }]);
   };
 
   const updateTraffic = (index: number, changes: Partial<TrafficFormState>) => {
@@ -355,10 +369,11 @@ export default function CreateEventPage() {
             </FormField>
 
             <FormField label="Prepared By">
-              <Input
+              <Select
                 value={formData.prepared_by || ''}
                 onChange={(e) => setFormData((prev) => ({ ...prev, prepared_by: e.target.value }))}
-                placeholder="Captain Rivera"
+                options={teamMemberNameOptions}
+                placeholder="Select preparer"
               />
             </FormField>
 
@@ -402,10 +417,11 @@ export default function CreateEventPage() {
             {formData.supervisors.map((supervisor, index) => (
               <div key={index} className="flex items-center space-x-3">
                 <div className="flex-1">
-                  <Input
+                  <Select
                     value={supervisor.supervisor_name}
                     onChange={(e) => updateSupervisor(index, 'supervisor_name', e.target.value)}
-                    placeholder="Supervisor name"
+                    options={teamMemberNameOptions}
+                    placeholder="Select supervisor"
                   />
                 </div>
                 {formData.supervisors.length > 1 && (
@@ -568,15 +584,40 @@ export default function CreateEventPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField label="Deputy">
-                      <Select
-                        value={control.member_id}
-                        onChange={(e) => {
-                          updateTraffic(index, { member_id: e.target.value });
-                        }}
-                        options={trafficMemberOptions}
-                        placeholder="Select deputy"
-                      />
+                    <FormField label="Staff Member" required error={errors[`traffic_${index}_member_id`]}>
+                      {(() => {
+                        const datalistId = `traffic-members-${index}`;
+                        return (
+                          <>
+                            <Input
+                              value={control.member_name}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                const match = findMemberByName(value);
+                                updateTraffic(index, {
+                                  member_name: value,
+                                  member_id: match ? match.member_id : '',
+                                });
+                                if (errors[`traffic_${index}_member_id`]) {
+                                  setErrors((prev) => {
+                                    const updated = { ...prev };
+                                    delete updated[`traffic_${index}_member_id`];
+                                    return updated;
+                                  });
+                                }
+                              }}
+                              placeholder="Enter staff member"
+                              list={datalistId}
+                              error={!!errors[`traffic_${index}_member_id`]}
+                            />
+                            <datalist id={datalistId}>
+                              {teamMemberNameOptions.map((option) => (
+                                <option key={`${option.value}-${index}`} value={option.value} />
+                              ))}
+                            </datalist>
+                          </>
+                        );
+                      })()}
                     </FormField>
 
                     <FormField label="Patrol Vehicle">

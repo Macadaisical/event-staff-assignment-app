@@ -446,7 +446,6 @@ export default function EventAssignmentsPage() {
 
                 <FormField
                   label="End Time"
-                  required
                   error={errors[`assignment_${index}_end_time`]}
                 >
                   <div className="relative">

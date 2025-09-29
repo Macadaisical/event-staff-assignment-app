@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSupabaseStore } from '@/stores/supabase-store';
-import { FormField, Input, Select } from '@/components/ui/form-field';
+import { FormField, Input } from '@/components/ui/form-field';
 import {
   Calendar,
   Car,
@@ -20,6 +20,7 @@ import {
 
 interface TrafficControlForm {
   member_id: string;
+  member_name: string;
   patrol_vehicle: string;
   area_assignment: string;
 }
@@ -82,15 +83,35 @@ export default function TrafficControlPage() {
 
     const existingControls = getTrafficControls(eventId);
     if (existingControls.length) {
-      setTrafficControls(existingControls.map((control) => ({
-        member_id: control.member_id,
-        patrol_vehicle: control.patrol_vehicle || '',
-        area_assignment: control.area_assignment || '',
-      })));
+      setTrafficControls(existingControls.map((control) => {
+        const matchedMember = teamMembers.find((member) => member.member_id === control.member_id);
+        return {
+          member_id: control.member_id,
+          member_name: matchedMember?.member_name ?? '',
+          patrol_vehicle: control.patrol_vehicle || '',
+          area_assignment: control.area_assignment || '',
+        };
+      }));
     }
 
     setHasInitialized(true);
-  }, [eventId, getTrafficControls, hasInitialized, storeTrafficControls]);
+  }, [eventId, getTrafficControls, hasInitialized, storeTrafficControls, teamMembers]);
+
+  useEffect(() => {
+    if (!teamMembers.length) {
+      return;
+    }
+
+    setTrafficControls((prev) =>
+      prev.map((control) => {
+        if (!control.member_id || control.member_name) {
+          return control;
+        }
+        const matchedMember = teamMembers.find((member) => member.member_id === control.member_id);
+        return matchedMember ? { ...control, member_name: matchedMember.member_name } : control;
+      }),
+    );
+  }, [teamMembers]);
 
   if (!event && (isEventLoading || events.length === 0)) {
     return (
@@ -175,6 +196,7 @@ export default function TrafficControlPage() {
   const addTrafficControl = () => {
     setTrafficControls(prev => [...prev, {
       member_id: '',
+      member_name: '',
       patrol_vehicle: '',
       area_assignment: ''
     }]);
@@ -195,27 +217,58 @@ export default function TrafficControlPage() {
   };
 
   const updateTrafficControl = (index: number, field: keyof TrafficControlForm, value: string) => {
-    setTrafficControls(prev => prev.map((control, i) =>
-      i === index ? { ...control, [field]: value } : control
-    ));
+    setTrafficControls((prev) =>
+      prev.map((control, i) => {
+        if (i !== index) return control;
+        if (field === 'member_name') {
+          const match = teamMembers.find(
+            (member) => member.member_name.trim().toLowerCase() === value.trim().toLowerCase(),
+          );
+          return {
+            ...control,
+            member_name: value,
+            member_id: match ? match.member_id : '',
+          };
+        }
+        return { ...control, [field]: value };
+      }),
+    );
 
     // Clear field error when user starts typing
-    const errorKey = `traffic_${index}_${field}`;
-    if (errors[errorKey]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[errorKey];
-        return newErrors;
+    const keysToClear = [
+      `traffic_${index}_${field}`,
+      ...(field === 'member_name' ? [`traffic_${index}_member_id`] : []),
+    ];
+
+    setErrors((prev) => {
+      const updated = { ...prev };
+      let changed = false;
+      keysToClear.forEach((key) => {
+        if (updated[key]) {
+          delete updated[key];
+          changed = true;
+        }
       });
-    }
+      return changed ? updated : prev;
+    });
   };
 
   const validateTrafficControls = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
     trafficControls.forEach((control, index) => {
-      if (!control.member_id) {
-        newErrors[`traffic_${index}_member_id`] = 'Deputy name is required';
+      const name = control.member_name.trim();
+      if (!name) {
+        newErrors[`traffic_${index}_member_id`] = 'Staff member is required';
+        return;
+      }
+
+      const match = teamMembers.find(
+        (member) => member.member_name.trim().toLowerCase() === name.toLowerCase(),
+      );
+
+      if (!match) {
+        newErrors[`traffic_${index}_member_id`] = 'Select a staff member from the team list';
       }
     });
 
@@ -251,11 +304,6 @@ export default function TrafficControlPage() {
       setIsSaving(false);
     }
   };
-
-  const memberOptions = activeMembers.map(member => ({
-    value: member.member_id,
-    label: member.member_name
-  }));
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -351,13 +399,25 @@ export default function TrafficControlPage() {
                   required
                   error={errors[`traffic_${index}_member_id`]}
                 >
-                  <Select
-                    value={control.member_id}
-                    onChange={(e) => updateTrafficControl(index, 'member_id', e.target.value)}
-                    options={memberOptions}
-                    placeholder="Select staff member"
-                    error={!!errors[`traffic_${index}_member_id`]}
-                  />
+                  {(() => {
+                    const datalistId = `traffic-control-members-${index}`;
+                    return (
+                      <>
+                        <Input
+                          value={control.member_name}
+                          onChange={(e) => updateTrafficControl(index, 'member_name', e.target.value)}
+                          placeholder="Enter staff member"
+                          list={datalistId}
+                          error={!!errors[`traffic_${index}_member_id`]}
+                        />
+                        <datalist id={datalistId}>
+                          {activeMembers.map((member) => (
+                            <option key={`${member.member_id}-${index}`} value={member.member_name} />
+                          ))}
+                        </datalist>
+                      </>
+                    );
+                  })()}
                 </FormField>
 
                 <FormField label="Patrol Vehicle">

@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSupabaseStore } from '@/stores/supabase-store';
-import { FormField, Input } from '@/components/ui/form-field';
+import { FormField, Input, Select } from '@/components/ui/form-field';
 import {
   ArrowLeft,
   Calendar,
@@ -35,6 +35,8 @@ export default function EventSupervisorsPage() {
     getSupervisors,
     replaceSupervisors,
     supervisors: storeSupervisors,
+    teamMembers,
+    fetchTeamMembers,
   } = useSupabaseStore();
 
   useEffect(() => {
@@ -45,6 +47,14 @@ export default function EventSupervisorsPage() {
     }
   }, [events.length, fetchEvents]);
 
+  useEffect(() => {
+    if (!teamMembers.length) {
+      fetchTeamMembers().catch((error: unknown) => {
+        console.error('Error loading team members:', error);
+      });
+    }
+  }, [teamMembers.length, fetchTeamMembers]);
+
   const event = events.find((e) => e.event_id === params.id);
   const eventId = event?.event_id;
 
@@ -52,6 +62,15 @@ export default function EventSupervisorsPage() {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  const teamMemberNameOptions = useMemo(
+    () =>
+      teamMembers.map((member) => ({
+        value: member.member_name,
+        label: member.member_name,
+      })),
+    [teamMembers],
+  );
 
   useEffect(() => {
     if (!eventId) {
@@ -285,10 +304,12 @@ export default function EventSupervisorsPage() {
                     required
                     error={nameError}
                   >
-                    <Input
+                    <Select
                       value={supervisor.supervisor_name}
                       onChange={(e) => updateSupervisor(index, 'supervisor_name', e.target.value)}
-                      placeholder="Supervisor name"
+                      options={teamMemberNameOptions}
+                      placeholder="Select supervisor"
+                      error={!!nameError}
                     />
                   </FormField>
 

@@ -1,11 +1,11 @@
 'use client';
 
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSupabaseStore } from '@/stores/supabase-store';
-import { FormField, Input, Textarea } from '@/components/ui/form-field';
+import { FormField, Input, Select, Textarea } from '@/components/ui/form-field';
 import { Calendar, Clock, MapPin, Save, X, ArrowLeft } from 'lucide-react';
 import type { EventFormData } from '@/types';
 
@@ -16,7 +16,7 @@ interface FormErrors {
 export default function EditEventPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { events, fetchEvents, updateEvent, isEventLoading } = useSupabaseStore();
+  const { events, fetchEvents, updateEvent, isEventLoading, teamMembers, fetchTeamMembers } = useSupabaseStore();
 
   useEffect(() => {
     if (!events.length) {
@@ -25,6 +25,14 @@ export default function EditEventPage() {
       });
     }
   }, [events.length, fetchEvents]);
+
+  useEffect(() => {
+    if (!teamMembers.length) {
+      fetchTeamMembers().catch((error: unknown) => {
+        console.error('Error loading team members:', error);
+      });
+    }
+  }, [teamMembers.length, fetchTeamMembers]);
 
   const event = events.find(e => e.event_id === params.id);
 
@@ -46,6 +54,15 @@ export default function EditEventPage() {
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const teamMemberNameOptions = useMemo(
+    () =>
+      teamMembers.map((member) => ({
+        value: member.member_name,
+        label: member.member_name,
+      })),
+    [teamMembers],
+  );
 
   useEffect(() => {
     if (event) {
@@ -265,10 +282,11 @@ export default function EditEventPage() {
             </FormField>
 
             <FormField label="Prepared By">
-              <Input
+              <Select
                 value={formData.prepared_by || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, prepared_by: e.target.value }))}
-                placeholder="Your name"
+                options={teamMemberNameOptions}
+                placeholder="Select preparer"
               />
             </FormField>
 
