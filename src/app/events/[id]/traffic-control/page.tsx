@@ -360,11 +360,7 @@ export default function TrafficControlPage() {
                   />
                 </FormField>
 
-                <FormField
-                  label="Patrol Vehicle"
-                  required
-                  error={errors[`traffic_${index}_patrol_vehicle`]}
-                >
+                <FormField label="Patrol Vehicle">
                   <div className="relative">
                     <Car className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                     <Input
@@ -372,16 +368,11 @@ export default function TrafficControlPage() {
                       onChange={(e) => updateTrafficControl(index, 'patrol_vehicle', e.target.value)}
                       placeholder="e.g., Unit 1, Bike Patrol, Golf Cart"
                       className="pl-10"
-                      error={!!errors[`traffic_${index}_patrol_vehicle`]}
                     />
                   </div>
                 </FormField>
 
-                <FormField
-                  label="Area Assignment"
-                  required
-                  error={errors[`traffic_${index}_area_assignment`]}
-                >
+                <FormField label="Area Assignment">
                   <div className="relative">
                     <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                     <Input
@@ -389,7 +380,6 @@ export default function TrafficControlPage() {
                       onChange={(e) => updateTrafficControl(index, 'area_assignment', e.target.value)}
                       placeholder="e.g., Main Entrance, Parking Lot A"
                       className="pl-10"
-                      error={!!errors[`traffic_${index}_area_assignment`]}
                     />
                   </div>
                 </FormField>

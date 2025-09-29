@@ -241,6 +241,10 @@ export default function EventAssignmentsPage() {
         newErrors[`assignment_${index}_member_id`] = 'Team member is required';
       }
 
+      if (!assignment.assignment_type) {
+        newErrors[`assignment_${index}_assignment_type`] = 'Assignment type is required';
+      }
+
       if (assignment.start_time && assignment.end_time && assignment.start_time >= assignment.end_time) {
         newErrors[`assignment_${index}_end_time`] = 'End time must be after start time';
       }
@@ -261,7 +265,7 @@ export default function EventAssignmentsPage() {
       // Convert form data to TeamAssignment objects
       const assignmentsToInsert = assignments.map((assignment, index) => ({
         member_id: assignment.member_id,
-        assignment_type: assignment.assignment_type || null,
+        assignment_type: assignment.assignment_type || 'General Support',
         equipment_area: assignment.equipment_area.trim() || null,
         start_time: assignment.start_time || null,
         end_time: assignment.end_time || null,
@@ -420,24 +424,15 @@ export default function EventAssignmentsPage() {
                   />
                 </FormField>
 
-                <FormField
-                  label="Equipment/Area"
-                  required
-                  error={errors[`assignment_${index}_equipment_area`]}
-                >
+                <FormField label="Equipment/Area">
                   <Input
                     value={assignment.equipment_area}
                     onChange={(e) => updateAssignment(index, 'equipment_area', e.target.value)}
                     placeholder="e.g., Sound System, Stage Left"
-                    error={!!errors[`assignment_${index}_equipment_area`]}
                   />
                 </FormField>
 
-                <FormField
-                  label="Start Time"
-                  required
-                  error={errors[`assignment_${index}_start_time`]}
-                >
+                <FormField label="Start Time">
                   <div className="relative">
                     <Clock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                     <Input
@@ -445,7 +440,6 @@ export default function EventAssignmentsPage() {
                       value={assignment.start_time}
                       onChange={(e) => updateAssignment(index, 'start_time', e.target.value)}
                       className="pl-10"
-                      error={!!errors[`assignment_${index}_start_time`]}
                     />
                   </div>
                 </FormField>
