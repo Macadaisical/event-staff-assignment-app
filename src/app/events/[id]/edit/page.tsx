@@ -39,7 +39,7 @@ export default function EditEventPage() {
     prepared_by: '',
     prepared_date: '',
     notes: '',
-    supervisors: [{ supervisor_name: '' }],
+    supervisors: [{ supervisor_name: '', phone: '', email: '' }],
     team_assignments: [],
     traffic_controls: [],
   });
@@ -60,7 +60,7 @@ export default function EditEventPage() {
         prepared_by: event.prepared_by ?? '',
         prepared_date: event.prepared_date ?? new Date().toISOString().split('T')[0],
         notes: event.notes ?? '',
-        supervisors: [{ supervisor_name: '' }], // TODO: Load actual supervisors
+        supervisors: [{ supervisor_name: '', phone: '', email: '' }], // TODO: Load actual supervisors
         team_assignments: [], // TODO: Load actual assignments
         traffic_controls: [], // TODO: Load actual traffic controls
       });
