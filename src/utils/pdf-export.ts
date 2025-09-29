@@ -9,6 +9,23 @@ interface PDFExportData {
   supervisors?: Supervisor[];
 }
 
+const safeText = (value: string | null | undefined, fallback = 'Not specified'): string => {
+  if (!value) return fallback;
+  const trimmed = typeof value === 'string' ? value.trim() : value;
+  return trimmed.length ? trimmed : fallback;
+};
+
+const safeDate = (value: string | null | undefined): string => {
+  if (!value) return 'Date TBD';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? 'Date TBD' : parsed.toLocaleDateString();
+};
+
+const safeTimeRange = (start: string | null | undefined, end: string | null | undefined): string => {
+  if (!start && !end) return 'Time TBD';
+  return `${start || 'TBD'} – ${end || 'TBD'}`;
+};
+
 export function exportEventToPDF(data: PDFExportData): void {
   const { event, teamMembers, teamAssignments = [], trafficControls = [], supervisors = [] } = data;
 
@@ -92,23 +109,6 @@ export function exportEventToPDF(data: PDFExportData): void {
       doc.addPage();
       yPos = 20;
     }
-  };
-
-  const safeText = (value: string | null | undefined, fallback = 'Not specified'): string => {
-    if (!value) return fallback;
-    const trimmed = typeof value === 'string' ? value.trim() : value;
-    return trimmed.length ? trimmed : fallback;
-  };
-
-  const safeDate = (value: string | null | undefined): string => {
-    if (!value) return 'Date TBD';
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? 'Date TBD' : parsed.toLocaleDateString();
-  };
-
-  const safeTimeRange = (start: string | null | undefined, end: string | null | undefined): string => {
-    if (!start && !end) return 'Time TBD';
-    return `${start || 'TBD'} – ${end || 'TBD'}`;
   };
 
   // Document header
@@ -241,7 +241,9 @@ export function exportEventSummary(data: PDFExportData): void {
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${new Date(event.event_date).toLocaleDateString()} at ${event.location}`, leftMargin, yPos);
+  const summaryDate = safeDate(event.event_date);
+  const summaryLocation = safeText(event.location, 'Location TBD');
+  doc.text(`${summaryDate} at ${summaryLocation}`, leftMargin, yPos);
   yPos += 8;
   doc.text(`${event.start_time} - ${event.end_time} (Team meet: ${event.team_meet_time})`, leftMargin, yPos);
   yPos += 15;
@@ -260,7 +262,9 @@ export function exportEventSummary(data: PDFExportData): void {
   doc.text(`• Total Active Staff: ${teamMembers.filter(m => m.active).length}`, leftMargin + 10, yPos);
 
   // Save summary
-  const eventDate = new Date(event.event_date).toISOString().split('T')[0];
+  const eventDate = event.event_date
+    ? new Date(event.event_date).toISOString().split('T')[0]
+    : 'undated';
   const filename = `${event.event_name.replace(/[^a-zA-Z0-9]/g, '_')}_${eventDate}_summary.pdf`;
 
   doc.save(filename);
