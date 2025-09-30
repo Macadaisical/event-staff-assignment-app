@@ -110,8 +110,12 @@ const SCOPEDashboard = () => {
             >
               {['St. Andrews Cookout', 'Trunk or Treat', 'Christmas Tree Lighting'].map((item, idx) => (
                 <div key={idx} className="py-2 px-3 text-sm transition-all cursor-pointer rounded-lg hover:bg-white/5" style={{ color: '#b8b9ba' }}
-                  onMouseEnter={(e) => e.target.style.color = '#e6e7e8'}
-                  onMouseLeave={(e) => e.target.style.color = '#b8b9ba'}>
+                  onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                    e.currentTarget.style.color = '#e6e7e8';
+                  }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                    e.currentTarget.style.color = '#b8b9ba';
+                  }}>
                   {item}
                 </div>
               ))}
@@ -125,8 +129,12 @@ const SCOPEDashboard = () => {
             >
               {['Capt. Elmer Horn', 'Sgt. Joe Pounds', 'TJ Jaglinski'].map((item, idx) => (
                 <div key={idx} className="py-2 px-3 text-sm transition-all cursor-pointer rounded-lg hover:bg-white/5" style={{ color: '#b8b9ba' }}
-                  onMouseEnter={(e) => e.target.style.color = '#e6e7e8'}
-                  onMouseLeave={(e) => e.target.style.color = '#b8b9ba'}>
+                  onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => {
+                    e.currentTarget.style.color = '#e6e7e8';
+                  }}
+                  onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => {
+                    e.currentTarget.style.color = '#b8b9ba';
+                  }}>
                   {item}
                 </div>
               ))}
@@ -266,8 +274,12 @@ const SCOPEDashboard = () => {
                         borderBottom: '1px solid rgba(0, 77, 102, 0.2)',
                         color: '#e6e7e8'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 52, 70, 0.4)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                      onMouseEnter={(e: React.MouseEvent<HTMLTableRowElement>) => {
+                        e.currentTarget.style.background = 'rgba(0, 52, 70, 0.4)';
+                      }}
+                      onMouseLeave={(e: React.MouseEvent<HTMLTableRowElement>) => {
+                        e.currentTarget.style.background = 'transparent';
+                      }}>
                         <td className="px-6 py-3.5 italic text-sm">{assignment.name}</td>
                         <td className="px-6 py-3.5 italic text-sm">{assignment.event}</td>
                         <td className="px-6 py-3.5 italic text-sm">{assignment.date}</td>
