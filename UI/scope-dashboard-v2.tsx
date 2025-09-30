@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Calendar, Users, Settings, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 const SCOPEDashboard = () => {
   const [eventsExpanded, setEventsExpanded] = useState(true);
@@ -39,7 +41,15 @@ const SCOPEDashboard = () => {
     { name: "Kiara Addison", event: "Christmas Tree Lighting", date: "December 1, 2025", hours: "5:00 p.m. to 9:00 p.m." }
   ];
 
-  const CollapsibleSection = ({ title, icon: Icon, isExpanded, onToggle, children }) => (
+  interface CollapsibleSectionProps {
+    title: string;
+    icon?: LucideIcon;
+    isExpanded: boolean;
+    onToggle: () => void;
+    children: ReactNode;
+  }
+
+  const CollapsibleSection = ({ title, icon: Icon, isExpanded, onToggle, children }: CollapsibleSectionProps) => (
     <div className="mb-3">
       <button
         onClick={onToggle}
