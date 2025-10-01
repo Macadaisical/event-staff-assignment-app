@@ -1,8 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import {
+  Settings,
+  Plus,
+  X,
+  Edit2,
+  Trash2,
+  Check,
+  Info,
+  Sparkles,
+  ClipboardList,
+} from 'lucide-react';
+
 import { useSupabaseStore } from '@/stores/supabase-store';
-import { Settings, Plus, X, Edit2, Trash2, Check } from 'lucide-react';
 
 export default function SettingsPage() {
   const {
@@ -12,6 +23,7 @@ export default function SettingsPage() {
     updateAssignmentCategory,
     deleteAssignmentCategory,
   } = useSupabaseStore();
+
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState<string | null>(null);
@@ -99,162 +111,226 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center">
-        <Settings className="h-8 w-8 text-gray-600 mr-3" />
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
-      </div>
-
-      {/* Assignment Categories */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Assignment Categories
-          </h3>
-          <button
-            onClick={() => {
-              setIsAddingCategory(true);
-              setCategoryError(null);
-              setNewCategoryName('');
-            }}
-            className="inline-flex items-center px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-3 w-3 mr-1" />
-            Add Category
-          </button>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-[#001a24] via-[#003446] to-[#002233] text-slate-100">
+      <main className="mx-auto w-full max-w-6xl px-6 py-12 lg:px-10">
+        <header className="mb-10 rounded-3xl border border-[#004d66] bg-gradient-to-r from-white/10 via-white/5 to-transparent p-8 text-[#f5f6f7] shadow-[0_20px_50px_rgba(0,0,0,0.35)] backdrop-blur">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-4">
+              <div className="inline-flex items-center gap-3 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-[#e9d29a]">
+                <Settings className="h-4 w-4" />
+                Settings
+              </div>
+              <div>
+                <h1 className="text-4xl font-semibold italic text-[#fdfbf7]">Configure your workspace</h1>
+                <p className="mt-3 max-w-2xl text-sm text-[#d0d6db]">
+                  Maintain assignment categories and review system information so everyone stays aligned on staffing expectations.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setIsAddingCategory(true);
+                setEditingCategory(null);
+                setEditingName('');
+                setCategoryError(null);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#004d66] to-[#003446] px-6 py-3 text-sm font-semibold text-[#e6e7e8] shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" />
+              Add Category
+            </button>
+          </div>
+        </header>
 
         {categoryError && (
-          <div className="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {categoryError}
+          <div className="mb-8 rounded-3xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100 shadow-[0_10px_30px_rgba(185,28,28,0.25)]">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 h-4 w-4" />
+              <span>{categoryError}</span>
+            </div>
           </div>
         )}
 
-        {/* Add Category Form */}
         {isAddingCategory && (
-          <div className="mb-4 p-3 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
-            <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                placeholder="Enter category name"
-                className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-white"
-                onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-                autoFocus
-              />
-              <button
-                onClick={handleAddCategory}
-                disabled={!newCategoryName.trim() || isSavingCategory}
-                className="px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-              >
-                {isSavingCategory ? 'Saving...' : 'Add'}
-              </button>
+          <section className="mb-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.55)] via-[rgba(0,36,53,0.42)] to-[rgba(0,36,53,0.32)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-[#e9d29a]">Add assignment category</h2>
+                <p className="mt-2 text-sm text-[#d0d6db]">Group staffing assignments under clear categories so supervisors can plan coverage efficiently.</p>
+              </div>
               <button
                 onClick={() => {
                   setIsAddingCategory(false);
                   setNewCategoryName('');
                 }}
-                className="px-3 py-2 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
               >
-                <X className="h-3 w-3" />
+                <X className="h-4 w-4" />
+                Cancel
               </button>
             </div>
-          </div>
+            <div className="mt-6 flex flex-col gap-3 md:flex-row">
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(event) => setNewCategoryName(event.target.value)}
+                onKeyDown={(event) => event.key === 'Enter' && handleAddCategory()}
+                placeholder="e.g. Crowd Control, Logistics, Incident Command"
+                className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-base text-white shadow-inner outline-none transition placeholder:text-[#9aa7b5] focus:border-[#e9d29a] focus:shadow-[0_0_0_2px_rgba(233,210,154,0.25)]"
+                autoFocus
+              />
+              <div className="flex gap-3 md:w-auto">
+                <button
+                  onClick={handleAddCategory}
+                  disabled={!newCategoryName.trim() || isSavingCategory}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500/80 to-emerald-600/80 px-6 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(16,185,129,0.3)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Check className="h-4 w-4" />
+                  {isSavingCategory ? 'Saving…' : 'Save Category'}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAddingCategory(false);
+                    setNewCategoryName('');
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white/10 px-6 py-3 text-sm font-semibold text-[#e6e7e8] transition hover:bg-white/15"
+                >
+                  <X className="h-4 w-4" />
+                  Close
+                </button>
+              </div>
+            </div>
+          </section>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {assignmentCategories.map((category) => (
-            <div
-              key={category}
-              className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-600 rounded-lg"
-            >
-              {editingCategory === category ? (
-                <div className="flex w-full items-center space-x-2">
-                  <input
-                    type="text"
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleUpdateCategory()}
-                    className="flex-1 rounded border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  />
-                  <button
-                    onClick={handleUpdateCategory}
-                    disabled={isSavingCategory}
-                    className="inline-flex items-center rounded bg-green-600 px-2 py-2 text-white hover:bg-green-700 disabled:opacity-50"
-                  >
-                    <Check className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={cancelEditing}
-                    className="inline-flex items-center rounded bg-gray-500 px-2 py-2 text-white hover:bg-gray-600"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <span className="text-gray-900 dark:text-white">{category}</span>
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => startEditingCategory(category)}
-                      className="p-1 text-gray-500 hover:text-gray-700"
-                    >
-                      <Edit2 className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCategory(category)}
-                      className="p-1 text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                </>
-              )}
+        <section className="mb-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-[#e9d29a]">Assignment Categories</h2>
+              <p className="text-xs uppercase tracking-wide text-[#d0d6db]">
+                {assignmentCategories.length} category{assignmentCategories.length === 1 ? '' : 'ies'} in use
+              </p>
             </div>
-          ))}
-        </div>
-      </div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#f5f6f7]">
+              <ClipboardList className="h-4 w-4" />
+              Staffing taxonomy
+            </span>
+          </div>
 
-      {/* Application Info */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Application Information
-        </h3>
-        <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Version</dt>
-            <dd className="text-sm text-gray-900 dark:text-white">1.0.0</dd>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {assignmentCategories.map((category) => (
+              <div
+                key={category}
+                className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-[#f5f6f7] shadow-[0_12px_28px_rgba(0,0,0,0.35)]"
+              >
+                {editingCategory === category ? (
+                  <div className="flex flex-col gap-3">
+                    <input
+                      type="text"
+                      value={editingName}
+                      onChange={(event) => setEditingName(event.target.value)}
+                      onKeyDown={(event) => event.key === 'Enter' && handleUpdateCategory()}
+                      className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:shadow-[0_0_0_2px_rgba(233,210,154,0.25)]"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={handleUpdateCategory}
+                        disabled={isSavingCategory}
+                        className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500/80 to-emerald-600/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Check className="h-4 w-4" />
+                        Save
+                      </button>
+                      <button
+                        onClick={cancelEditing}
+                        className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#e6e7e8] transition hover:bg-white/20"
+                      >
+                        <X className="h-4 w-4" />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-base font-medium text-white">{category}</p>
+                      <p className="mt-1 text-xs uppercase tracking-wide text-[#d0d6db]">Assignment grouping</p>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        onClick={() => startEditingCategory(category)}
+                        className="inline-flex items-center justify-center rounded-full bg-white/10 p-2 text-[#e6e7e8] transition hover:bg-white/20"
+                        aria-label={`Edit ${category}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategory(category)}
+                        className="inline-flex items-center justify-center rounded-full bg-red-500/20 p-2 text-red-100 transition hover:bg-red-500/30"
+                        aria-label={`Delete ${category}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-          <div>
-            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Built with</dt>
-            <dd className="text-sm text-gray-900 dark:text-white">Next.js, TypeScript, Tailwind CSS</dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Storage</dt>
-            <dd className="text-sm text-gray-900 dark:text-white">Supabase PostgreSQL</dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Data Persistence</dt>
-            <dd className="text-sm text-gray-900 dark:text-white">Supabase-backed Zustand Store</dd>
-          </div>
-        </dl>
-      </div>
+        </section>
 
-      {/* Future Features */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-700">
-        <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-4">
-          🚀 Coming Soon
-        </h3>
-        <ul className="space-y-2 text-blue-800 dark:text-blue-200">
-          <li>• Cloud storage integration (Airtable/Google Sheets)</li>
-          <li>• User authentication and permissions</li>
-          <li>• Real-time collaboration</li>
-          <li>• Mobile app for team members</li>
-          <li>• Advanced reporting and analytics</li>
-          <li>• Calendar integration</li>
-        </ul>
-      </div>
+        <section className="mb-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.35)] via-[rgba(0,36,53,0.28)] to-[rgba(0,36,53,0.22)] p-6 text-[#f5f6f7] shadow-[0_14px_28px_rgba(0,0,0,0.35)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-[#e9d29a]">Application Information</h2>
+              <p className="text-xs uppercase tracking-wide text-[#d0d6db]">Platform overview</p>
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#f5f6f7]">
+              <Info className="h-4 w-4" />
+              System
+            </span>
+          </div>
+          <dl className="mt-6 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm">
+              <dt className="text-xs uppercase tracking-wide text-[#94a7b5]">Version</dt>
+              <dd className="mt-2 text-base font-medium text-white">1.0.0</dd>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm">
+              <dt className="text-xs uppercase tracking-wide text-[#94a7b5]">Built with</dt>
+              <dd className="mt-2 text-base font-medium text-white">Next.js · TypeScript · Tailwind CSS</dd>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm">
+              <dt className="text-xs uppercase tracking-wide text-[#94a7b5]">Storage</dt>
+              <dd className="mt-2 text-base font-medium text-white">Supabase PostgreSQL</dd>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm">
+              <dt className="text-xs uppercase tracking-wide text-[#94a7b5]">Data Persistence</dt>
+              <dd className="mt-2 text-base font-medium text-white">Supabase-backed Zustand store</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(30,64,175,0.35)] via-[rgba(15,52,92,0.32)] to-[rgba(4,31,56,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(10,28,61,0.45)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-[#c7d2fe]">Coming Soon</h2>
+              <p className="text-xs uppercase tracking-wide text-[#d0d6f7]">Future roadmap highlights</p>
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#c7d2fe]">
+              <Sparkles className="h-4 w-4" />
+              Roadmap
+            </span>
+          </div>
+          <ul className="mt-6 space-y-3 text-sm text-[#d0d6f7]">
+            <li>• Cloud storage integrations (Airtable, Google Sheets)</li>
+            <li>• Role-based permissions and custom access levels</li>
+            <li>• Real-time collaboration for on-the-fly staffing adjustments</li>
+            <li>• Mobile experience for field teams</li>
+            <li>• Deep-dive analytics and printable reports</li>
+            <li>• Calendar sync with agency scheduling systems</li>
+          </ul>
+        </section>
+      </main>
     </div>
   );
 }
