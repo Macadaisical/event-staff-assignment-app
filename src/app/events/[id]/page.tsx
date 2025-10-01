@@ -3,32 +3,106 @@
 import { useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useSupabaseStore } from '@/stores/supabase-store';
-import { exportEventToPDF } from '@/utils/pdf-export';
 import {
-  Calendar,
-  Users,
-  Edit,
   ArrowLeft,
-  FileText,
+  Calendar,
   Car,
+  ClipboardList,
+  Clock,
+  Edit,
+  FileText,
+  Loader2,
+  MapPin,
+  ShieldCheck,
+  Users,
 } from 'lucide-react';
 
-const formatDate = (value: string | null | undefined): string => {
-  if (!value) return 'Date TBD';
+import { useSupabaseStore } from '@/stores/supabase-store';
+import { exportEventToPDF } from '@/utils/pdf-export';
+
+const parseEventDate = (value: string | null | undefined): Date | null => {
+  if (!value) return null;
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? 'Date TBD' : parsed.toLocaleDateString();
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatEventDate = (value: string | null | undefined): string => {
+  const parsed = parseEventDate(value);
+  if (!parsed) return 'Date TBD';
+  return parsed.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const formatShortDate = (value: string | null | undefined): string => {
+  const parsed = parseEventDate(value);
+  if (!parsed) return 'TBD';
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const formatTime = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const [hours, minutes] = value.split(':');
+  if (hours === undefined || minutes === undefined) return null;
+  const date = new Date();
+  date.setHours(Number(hours), Number(minutes), 0, 0);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 };
 
 const formatTimeRange = (start: string | null | undefined, end: string | null | undefined): string => {
-  if (!start && !end) return 'Time TBD';
-  return `${start || 'TBD'} – ${end || 'TBD'}`;
+  const formattedStart = formatTime(start);
+  const formattedEnd = formatTime(end);
+
+  if (formattedStart && formattedEnd) {
+    return `${formattedStart} – ${formattedEnd}`;
+  }
+  if (formattedStart) return formattedStart;
+  if (formattedEnd) return formattedEnd;
+  return 'Time TBD';
 };
 
 const formatText = (value: string | null | undefined, fallback = 'Not specified'): string => {
   if (!value) return fallback;
   const trimmed = value.trim();
   return trimmed.length ? trimmed : fallback;
+};
+
+const determineEventStatus = (value: string | null | undefined): 'upcoming' | 'past' | 'unknown' => {
+  const parsed = parseEventDate(value);
+  if (!parsed) return 'unknown';
+  const today = new Date();
+  parsed.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return parsed >= today ? 'upcoming' : 'past';
+};
+
+const STATUS_STYLES: Record<'upcoming' | 'past' | 'unknown', { label: string; badge: string; ring: string }> = {
+  upcoming: {
+    label: 'Upcoming',
+    badge: 'bg-emerald-500/20 text-emerald-200',
+    ring: 'ring-emerald-500/40',
+  },
+  past: {
+    label: 'Completed',
+    badge: 'bg-red-500/20 text-red-200',
+    ring: 'ring-red-500/40',
+  },
+  unknown: {
+    label: 'Scheduled',
+    badge: 'bg-slate-500/20 text-slate-200',
+    ring: 'ring-slate-500/40',
+  },
 };
 
 export default function EventDetailPage() {
@@ -64,11 +138,13 @@ export default function EventDetailPage() {
   }, [teamMembers.length, fetchTeamMembers]);
 
   const eventId = params.id;
-  const event = events.find((e) => e.event_id === eventId);
+  const event = events.find((item) => item.event_id === eventId);
 
   useEffect(() => {
-    if (!eventId) return;
-    const loadRelatedData = async () => {
+    if (!eventId) {
+      return;
+    }
+    const loadRelated = async () => {
       try {
         await Promise.all([
           fetchTeamAssignments(eventId),
@@ -76,11 +152,11 @@ export default function EventDetailPage() {
           fetchSupervisors(eventId),
         ]);
       } catch (error) {
-        console.error('Error loading event-related data:', error);
+        console.error('Error loading event relationships:', error);
       }
     };
 
-    loadRelatedData();
+    loadRelated();
   }, [eventId, fetchTeamAssignments, fetchTrafficControls, fetchSupervisors]);
 
   const eventAssignments = useMemo(() => {
@@ -107,45 +183,14 @@ export default function EventDetailPage() {
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   }, [eventId, supervisors]);
 
-  if (!event && isEventLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading event...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!event) {
-    return (
-      <div className="text-center py-12">
-        <Calendar className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-          Event Not Found
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          The event you&apos;re looking for doesn&apos;t exist or may have been deleted.
-        </p>
-        <Link
-          href="/events"
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Events
-        </Link>
-      </div>
-    );
-  }
-
   const getMemberName = (memberId: string | null | undefined): string => {
     if (!memberId) return 'Not specified';
-    const member = teamMembers.find((m) => m.member_id === memberId);
-    return member ? member.member_name : 'Not specified';
+    const match = teamMembers.find((member) => member.member_id === memberId);
+    return match ? match.member_name : 'Not specified';
   };
 
   const handleExport = () => {
+    if (!event) return;
     exportEventToPDF({
       event,
       teamMembers,
@@ -155,191 +200,285 @@ export default function EventDetailPage() {
     });
   };
 
-  return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center space-x-4">
+  if (!event && isEventLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center bg-gradient-to-br from-[#001a24] via-[#003446] to-[#002233]">
+        <div className="text-center text-slate-200">
+          <Loader2 className="mx-auto h-10 w-10 animate-spin text-[#e9d29a]" />
+          <p className="mt-4 text-sm text-[#d0d6db]">Loading event...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#001a24] via-[#003446] to-[#002233] text-slate-100">
+        <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 text-center">
+          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-white/10">
+            <Calendar className="h-12 w-12 text-[#e9d29a]" />
+          </div>
+          <h2 className="mt-6 text-3xl font-semibold">Event not found</h2>
+          <p className="mt-3 max-w-md text-sm text-[#d0d6db]">
+            The event you are looking for may have been deleted or is unavailable. Return to the events list to continue planning.
+          </p>
           <Link
             href="/events"
-            className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            className="mt-8 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#004d66] to-[#003446] px-6 py-3 text-sm font-semibold text-[#e6e7e8] shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition hover:opacity-90"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4" />
+            Back to Events
           </Link>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{event.event_name}</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {formatDate(event.event_date)} · {formatTimeRange(event.start_time, event.end_time)}
-            </p>
+        </div>
+      </div>
+    );
+  }
+
+  const eventStatus = determineEventStatus(event.event_date);
+  const { badge: statusBadge, label: statusLabel, ring: statusRing } = STATUS_STYLES[eventStatus];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#001a24] via-[#003446] to-[#002233] text-slate-100">
+      <main className="mx-auto w-full max-w-6xl px-6 py-12 lg:px-10">
+        {/* Hero */}
+        <div className="mb-10 overflow-hidden rounded-3xl border border-[#004d66] bg-gradient-to-r from-white/10 via-white/5 to-transparent p-8 text-[#f5f6f7] shadow-[0_20px_50px_rgba(0,0,0,0.35)] backdrop-blur">
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center gap-4">
+                <Link
+                  href="/events"
+                  className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Back to Events
+                </Link>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusBadge}`}>{statusLabel}</span>
+              </div>
+
+              <div>
+                <h1 className="text-4xl font-semibold italic text-[#fdfbf7]">{event.event_name}</h1>
+                <p className="mt-3 flex flex-wrap items-center gap-4 text-sm text-[#d0d6db]">
+                  <span className="inline-flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-[#e9d29a]" />
+                    {formatEventDate(event.event_date)}
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[#e9d29a]" />
+                    {formatTimeRange(event.start_time, event.end_time)}
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-[#e9d29a]" />
+                    {formatText(event.location, 'Location TBD')}
+                  </span>
+                </p>
+              </div>
+
+              <div className="grid gap-4 text-sm text-[#d0d6db] md:grid-cols-3">
+                <div className="rounded-2xl bg-white/10 p-4 shadow-inner">
+                  <p className="text-xs uppercase tracking-wide text-[#94a7b5]">Team Meet</p>
+                  <p className="mt-2 flex items-center gap-2 text-base font-medium text-white">
+                    <Clock className="h-4 w-4 text-[#e9d29a]" />
+                    {formatTime(event.team_meet_time) ?? 'Time TBD'}
+                  </p>
+                  <p className="mt-2 text-xs text-[#d0d6db]">Meet at {formatText(event.meet_location, 'Location TBD')}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-4 shadow-inner">
+                  <p className="text-xs uppercase tracking-wide text-[#94a7b5]">Prepared By</p>
+                  <p className="mt-2 text-base font-medium text-white">{formatText(event.prepared_by, 'Unassigned')}</p>
+                  <p className="mt-2 text-xs text-[#d0d6db]">Updated {formatShortDate(event.prepared_date)}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 p-4 shadow-inner">
+                  <p className="text-xs uppercase tracking-wide text-[#94a7b5]">Notes</p>
+                  <p className="mt-2 text-sm text-white/90">{formatText(event.notes, 'No additional notes')}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 md:w-56">
+              <Link
+                href={`/events/${event.event_id}/edit`}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#004d66] to-[#003446] px-5 py-2.5 text-sm font-semibold text-[#e6e7e8] shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition hover:opacity-90"
+              >
+                <Edit className="h-4 w-4" />
+                Edit Event
+              </Link>
+              <button
+                type="button"
+                onClick={handleExport}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[rgba(233,210,154,0.25)] to-[rgba(233,210,154,0.15)] px-5 py-2.5 text-sm font-semibold text-[#e9d29a] transition hover:from-[rgba(233,210,154,0.35)] hover:to-[rgba(233,210,154,0.25)]"
+              >
+                <FileText className="h-4 w-4" />
+                Export PDF
+              </button>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+
+        {/* Quick actions */}
+        <section className="mb-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           <Link
-            href={`/events/${event.event_id}/edit`}
-            className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 transition-colors"
+            href={`/events/${event.event_id}/assignments`}
+            className="group overflow-hidden rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.55)] via-[rgba(0,36,53,0.42)] to-[rgba(0,36,53,0.32)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)] transition hover:translate-y-[-2px] hover:shadow-[0_22px_40px_rgba(0,0,0,0.55)]"
           >
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Event
+            <div className="mb-5 inline-flex items-center gap-3 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#e9d29a]">
+              <Users className="h-4 w-4" />
+              Assignments
+            </div>
+            <h3 className="text-xl font-semibold text-white">Manage Team Coverage</h3>
+            <p className="mt-3 text-sm text-[#d0d6db]">Create and refine assignments so every post has coverage.</p>
+            <p className="mt-4 text-xs uppercase tracking-wide text-[#e9d29a]">Go to assignments →</p>
           </Link>
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+
+          <Link
+            href={`/events/${event.event_id}/traffic-control`}
+            className="group overflow-hidden rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.55)] via-[rgba(0,36,53,0.42)] to-[rgba(0,36,53,0.32)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)] transition hover:translate-y-[-2px] hover:shadow-[0_22px_40px_rgba(0,0,0,0.55)]"
           >
-            <FileText className="h-4 w-4 mr-2" />
-            Export PDF
-          </button>
-        </div>
-      </div>
+            <div className="mb-5 inline-flex items-center gap-3 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#e9d29a]">
+              <Car className="h-4 w-4" />
+              Traffic Control
+            </div>
+            <h3 className="text-xl font-semibold text-white">Coordinate Traffic Posts</h3>
+            <p className="mt-3 text-sm text-[#d0d6db]">Assign deputies, vehicles, and coverage areas for ingress and egress.</p>
+            <p className="mt-4 text-xs uppercase tracking-wide text-[#e9d29a]">Manage traffic →</p>
+          </Link>
 
-      {/* Event Overview */}
-      <section className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-700 dark:text-gray-300">
-          <div className="space-y-3">
-            <p><span className="font-semibold">Location:</span> {formatText(event.location)}</p>
-            <p><span className="font-semibold">Team Meet Time:</span> {event.team_meet_time || 'Time TBD'}</p>
-            <p><span className="font-semibold">Meet Location:</span> {formatText(event.meet_location)}</p>
+          <Link
+            href={`/events/${event.event_id}/supervisors`}
+            className="group overflow-hidden rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.55)] via-[rgba(0,36,53,0.42)] to-[rgba(0,36,53,0.32)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)] transition hover:translate-y-[-2px] hover:shadow-[0_22px_40px_rgba(0,0,0,0.55)]"
+          >
+            <div className="mb-5 inline-flex items-center gap-3 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#e9d29a]">
+              <ShieldCheck className="h-4 w-4" />
+              Supervisors
+            </div>
+            <h3 className="text-xl font-semibold text-white">Confirm Command Staff</h3>
+            <p className="mt-3 text-sm text-[#d0d6db]">Document supervisory contacts so everyone knows the chain of command.</p>
+            <p className="mt-4 text-xs uppercase tracking-wide text-[#e9d29a]">Manage supervisors →</p>
+          </Link>
+        </section>
+
+        {/* Supervisors */}
+        <section className="mb-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-semibold text-[#e9d29a]">Supervisors</h2>
+            <span className="text-xs uppercase tracking-wide text-[#d0d6db]">
+              {eventSupervisors.length} supervisor{eventSupervisors.length === 1 ? '' : 's'} assigned
+            </span>
           </div>
-          <div className="space-y-3">
-            <p><span className="font-semibold">Prepared By:</span> {formatText(event.prepared_by)}</p>
-            <p><span className="font-semibold">Date Prepared:</span> {formatDate(event.prepared_date)}</p>
-            <p><span className="font-semibold">Notes:</span> {formatText(event.notes, 'No additional notes')}</p>
+          <div className="mt-6 grid gap-4 md:grid-cols-2">
+            {eventSupervisors.length ? (
+              eventSupervisors.map((supervisor, index) => (
+                <div
+                  key={supervisor.supervisor_id ?? index}
+                  className={`rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-[#f5f6f7] ${statusRing}`}
+                >
+                  <p className="text-xs uppercase tracking-wide text-[#94a7b5]">Supervisor {index + 1}</p>
+                  <p className="mt-2 text-base font-medium text-white">{formatText(supervisor.supervisor_name, 'Unnamed supervisor')}</p>
+                  <p className="mt-2 text-xs text-[#d0d6db]">Phone: {formatText(supervisor.phone, '—')}</p>
+                  <p className="text-xs text-[#d0d6db]">Email: {formatText(supervisor.email, '—')}</p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-[#d0d6db]">
+                No supervisors recorded yet.
+              </div>
+            )}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Link
-          href={`/events/${event.event_id}/assignments`}
-          className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow group"
-        >
-          <div className="flex items-center justify-center w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg mb-4 group-hover:bg-green-200 dark:group-hover:bg-green-900/50 transition-colors">
-            <Users className="h-6 w-6 text-green-600 dark:text-green-400" />
+        {/* Team assignments */}
+        <section className="mb-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-[#e9d29a]">Team Assignments</h2>
+              <p className="text-xs uppercase tracking-wide text-[#d0d6db]">{eventAssignments.length} assignment{eventAssignments.length === 1 ? '' : 's'} published</p>
+            </div>
+            <Link
+              href={`/events/${event.event_id}/assignments`}
+              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
+            >
+              <ClipboardList className="h-4 w-4" />
+              Update assignments
+            </Link>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Manage Assignments</h3>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
-            Create or update staff assignments for this event.
-          </p>
-        </Link>
 
-        <Link
-          href={`/events/${event.event_id}/traffic-control`}
-          className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow group"
-        >
-          <div className="flex items-center justify-center w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg mb-4 group-hover:bg-orange-200 dark:group-hover:bg-orange-900/50 transition-colors">
-            <Car className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Traffic Assignments</h3>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
-            Coordinate deputies and patrol vehicles for traffic control.
-          </p>
-        </Link>
-
-        <Link
-          href={`/events/${event.event_id}/supervisors`}
-          className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow group"
-        >
-          <div className="flex items-center justify-center w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg mb-4 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 transition-colors">
-            <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Manage Supervisors</h3>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
-            {eventSupervisors.length ? `${eventSupervisors.length} supervisor(s) assigned` : 'No supervisors assigned yet'}
-          </p>
-        </Link>
-      </div>
-
-      {/* Supervisors */}
-      <section className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Supervisors</h2>
-        {eventSupervisors.length ? (
-          <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-            {eventSupervisors.map((supervisor, index) => (
-              <li key={supervisor.supervisor_id} className="flex items-center gap-2">
-                <span className="font-medium">Supervisor {index + 1}:</span>
-                <span>{formatText(supervisor.supervisor_name, 'Unnamed supervisor')}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-gray-500 dark:text-gray-400">No supervisors assigned.</p>
-        )}
-      </section>
-
-      {/* Team Assignments */}
-      <section className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Team Assignments</h2>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {eventAssignments.length} assignment{eventAssignments.length === 1 ? '' : 's'}
-          </span>
-        </div>
-        {eventAssignments.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/40">
-                <tr>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Team Member</th>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Assignment</th>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Equipment / Area</th>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Time</th>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {eventAssignments.map((assignment) => (
-                  <tr key={assignment.assignment_id}>
-                    <td className="px-4 py-2 text-gray-800 dark:text-gray-200">{getMemberName(assignment.member_id)}</td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{formatText(assignment.assignment_type, '—')}</td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{formatText(assignment.equipment_area, '—')}</td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{formatTimeRange(assignment.start_time, assignment.end_time)}</td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{formatText(assignment.notes, '—')}</td>
+          {eventAssignments.length ? (
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-white/10">
+              <table className="min-w-full divide-y divide-white/10 text-sm">
+                <thead className="bg-white/5 text-xs uppercase tracking-wide text-[#e9d29a]">
+                  <tr>
+                    <th className="px-5 py-3 text-left">Team Member</th>
+                    <th className="px-5 py-3 text-left">Assignment</th>
+                    <th className="px-5 py-3 text-left">Equipment / Area</th>
+                    <th className="px-5 py-3 text-left">Hours</th>
+                    <th className="px-5 py-3 text-left">Notes</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500 dark:text-gray-400">No assignments recorded for this event.</p>
-        )}
-      </section>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {eventAssignments.map((assignment) => (
+                    <tr key={assignment.assignment_id} className="transition hover:bg-white/5">
+                      <td className="px-5 py-3 text-[#f5f6f7]">{getMemberName(assignment.member_id)}</td>
+                      <td className="px-5 py-3 text-[#d0d6db]">{formatText(assignment.assignment_type, '—')}</td>
+                      <td className="px-5 py-3 text-[#d0d6db]">{formatText(assignment.equipment_area, '—')}</td>
+                      <td className="px-5 py-3 text-[#d0d6db]">{formatTimeRange(assignment.start_time, assignment.end_time)}</td>
+                      <td className="px-5 py-3 text-[#d0d6db]">{formatText(assignment.notes, '—')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-[#d0d6db]">
+              No assignments recorded yet. Add staffing coverage from the assignments page.
+            </div>
+          )}
+        </section>
 
-      {/* Traffic Control */}
-      <section className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Traffic Control</h2>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {eventTraffic.length} post{eventTraffic.length === 1 ? '' : 's'}
-          </span>
-        </div>
-        {eventTraffic.length ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/40">
-                <tr>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Staff Member</th>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Patrol Vehicle</th>
-                  <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Area Assignment</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {eventTraffic.map((control) => (
-                  <tr key={control.traffic_id}>
-                    <td className="px-4 py-2 text-gray-800 dark:text-gray-200">
-                      {formatText(control.staff_name, getMemberName(control.member_id))}
-                    </td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{formatText(control.patrol_vehicle, '—')}</td>
-                    <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{formatText(control.area_assignment, '—')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Traffic control */}
+        <section className="mb-4 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-[#e9d29a]">Traffic Control</h2>
+              <p className="text-xs uppercase tracking-wide text-[#d0d6db]">{eventTraffic.length} post{eventTraffic.length === 1 ? '' : 's'} planned</p>
+            </div>
+            <Link
+              href={`/events/${event.event_id}/traffic-control`}
+              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
+            >
+              <Car className="h-4 w-4" />
+              Update traffic plan
+            </Link>
           </div>
-        ) : (
-          <p className="text-sm text-gray-500 dark:text-gray-400">No traffic control assignments recorded.</p>
-        )}
-      </section>
+
+          {eventTraffic.length ? (
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-white/10">
+              <table className="min-w-full divide-y divide-white/10 text-sm">
+                <thead className="bg-white/5 text-xs uppercase tracking-wide text-[#e9d29a]">
+                  <tr>
+                    <th className="px-5 py-3 text-left">Staff Member</th>
+                    <th className="px-5 py-3 text-left">Patrol Vehicle</th>
+                    <th className="px-5 py-3 text-left">Area Assignment</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {eventTraffic.map((control) => (
+                    <tr key={control.traffic_id} className="transition hover:bg-white/5">
+                      <td className="px-5 py-3 text-[#f5f6f7]">
+                        {formatText(control.staff_name, getMemberName(control.member_id))}
+                      </td>
+                      <td className="px-5 py-3 text-[#d0d6db]">{formatText(control.patrol_vehicle, '—')}</td>
+                      <td className="px-5 py-3 text-[#d0d6db]">{formatText(control.area_assignment, '—')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-[#d0d6db]">
+              No traffic control assignments recorded yet. Configure details from the traffic control page.
+            </div>
+          )}
+        </section>
+      </main>
     </div>
   );
 }
