@@ -52,6 +52,34 @@ export interface Supervisor {
   sort_order?: number | null;
 }
 
+export type TaskStatus = 'Not Started' | 'In Progress' | 'Completed';
+
+export interface EventTask {
+  task_id: string;
+  event_id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  due_date: string | null; // ISO date string
+  due_time: string | null; // HH:MM format
+  assignee_id: string | null;
+  category_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskCategory {
+  category_id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // UI-specific types
 export interface EventFormData extends Omit<Event, 'event_id' | 'created_at'> {
   supervisors: Omit<Supervisor, 'supervisor_id' | 'event_id'>[];

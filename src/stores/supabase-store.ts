@@ -11,7 +11,10 @@ import type {
   TeamAssignment,
   TrafficControl,
   Supervisor,
-  AssignmentCategory
+  AssignmentCategory,
+  EventTask,
+  TaskCategory,
+  TaskStatus,
 } from '@/types';
 
 // Database row types
@@ -20,6 +23,8 @@ type TeamMemberRow = Database['public']['Tables']['team_members']['Row'];
 type TeamAssignmentRow = Database['public']['Tables']['team_assignments']['Row'];
 type TrafficControlRow = Database['public']['Tables']['traffic_controls']['Row'];
 type SupervisorRow = Database['public']['Tables']['supervisors']['Row'];
+type TaskCategoryRow = Database['public']['Tables']['task_categories']['Row'];
+type EventTaskRow = Database['public']['Tables']['event_tasks']['Row'];
 
 const DEFAULT_LOCATION = 'Location TBD';
 const DEFAULT_MEET_LOCATION = 'Meet TBD';
@@ -39,6 +44,8 @@ const DEFAULT_ASSIGNMENT_CATEGORIES: AssignmentCategory[] = [
   'General Support',
   'Technical Support',
 ];
+const DEFAULT_TASK_COLOR = '#2563EB';
+const DEFAULT_TASK_STATUS: TaskStatus = 'Not Started';
 
 const normalizeCategoryName = (value: string): string => value.trim().replace(/\s+/g, ' ');
 const dedupeAndSortCategories = (categories: string[]): string[] => {
@@ -131,6 +138,43 @@ const dbSupervisorToSupervisor = (dbSupervisor: SupervisorRow): Supervisor => ({
   sort_order: dbSupervisor.sort_order ?? null,
 });
 
+const normalizeHexColor = (value: string | null | undefined): string => {
+  if (!value) return DEFAULT_TASK_COLOR;
+  const trimmed = value.trim();
+  return /^#[0-9A-Fa-f]{6}$/.test(trimmed) ? trimmed.toUpperCase() : DEFAULT_TASK_COLOR;
+};
+
+const formatTimeString = (value: string | null): string | null => {
+  if (!value) return null;
+  return value.length >= 5 ? value.slice(0, 5) : value;
+};
+
+const dbTaskCategoryToTaskCategory = (row: TaskCategoryRow): TaskCategory => ({
+  category_id: row.category_id,
+  user_id: row.user_id,
+  name: row.name,
+  color: normalizeHexColor(row.color),
+  sort_order: row.sort_order,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+});
+
+const dbEventTaskToEventTask = (row: EventTaskRow): EventTask => ({
+  task_id: row.task_id,
+  event_id: row.event_id,
+  user_id: row.user_id,
+  title: row.title,
+  description: row.description,
+  status: row.status,
+  due_date: row.due_date,
+  due_time: formatTimeString(row.due_time),
+  assignee_id: row.assignee_id,
+  category_id: row.category_id,
+  sort_order: row.sort_order,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
+});
+
 interface SupabaseStore {
   // State
   user: User | null;
@@ -143,6 +187,10 @@ interface SupabaseStore {
   teamAssignments: TeamAssignment[];
   trafficControls: TrafficControl[];
   supervisors: Supervisor[];
+  taskCategories: TaskCategory[];
+  isTaskCategoriesLoading: boolean;
+  eventTasks: EventTask[];
+  isEventTasksLoading: boolean;
 
   // Event actions
   fetchEvents: () => Promise<void>;
@@ -150,6 +198,11 @@ interface SupabaseStore {
   updateEvent: (event: Event) => Promise<void>;
   deleteEvent: (eventId: string) => Promise<void>;
   setCurrentEvent: (event: Event | null) => void;
+  duplicateEventWithChildren: (sourceEventId: string, options?: {
+    eventDate?: string | null;
+    eventName?: string | null;
+    dueDateOffset?: number | null;
+  }) => Promise<string | null>;
 
   // Team Member actions
   fetchTeamMembers: () => Promise<void>;
@@ -180,6 +233,51 @@ interface SupabaseStore {
   updateAssignmentCategory: (currentName: string, updatedName: string) => Promise<void>;
   deleteAssignmentCategory: (categoryName: string) => Promise<void>;
 
+  // Task categories
+  fetchTaskCategories: () => Promise<void>;
+  createTaskCategory: (input: { name: string; color?: string; sort_order?: number }) => Promise<TaskCategory | null>;
+  updateTaskCategory: (
+    categoryId: string,
+    updates: { name?: string; color?: string; sort_order?: number },
+  ) => Promise<void>;
+  deleteTaskCategory: (categoryId: string) => Promise<void>;
+  reorderTaskCategories: (updates: { category_id: string; sort_order: number }[]) => Promise<void>;
+
+  // Event task actions
+  fetchEventTasks: (eventId: string) => Promise<void>;
+  createEventTask: (
+    eventId: string,
+    task: {
+      title: string;
+      description?: string | null;
+      status?: TaskStatus;
+      due_date?: string | null;
+      due_time?: string | null;
+      assignee_id?: string | null;
+      category_id?: string | null;
+      sort_order?: number;
+    },
+  ) => Promise<EventTask | null>;
+  updateEventTask: (
+    taskId: string,
+    updates: {
+      title?: string;
+      description?: string | null;
+      status?: TaskStatus;
+      due_date?: string | null;
+      due_time?: string | null;
+      assignee_id?: string | null;
+      category_id?: string | null;
+      sort_order?: number;
+    },
+  ) => Promise<void>;
+  deleteEventTask: (taskId: string) => Promise<void>;
+  reorderEventTasks: (
+    eventId: string,
+    updates: { task_id: string; sort_order: number }[],
+  ) => Promise<void>;
+  getEventTasks: (eventId: string) => EventTask[];
+
   // Loading states
   setIsEventLoading: (loading: boolean) => void;
   setIsTeamMembersLoading: (loading: boolean) => void;
@@ -197,6 +295,10 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   teamAssignments: [],
   trafficControls: [],
   supervisors: [],
+  taskCategories: [],
+  isTaskCategoriesLoading: false,
+  eventTasks: [],
+  isEventTasksLoading: false,
 
   // Event actions
   fetchEvents: async () => {
@@ -331,6 +433,49 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   },
 
   setCurrentEvent: (event) => set({ currentEvent: event }),
+
+  duplicateEventWithChildren: async (
+    sourceEventId,
+    options: { eventDate?: string | null; eventName?: string | null; dueDateOffset?: number | null } = {},
+  ) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: duplicatedEventId, error } = await supabase
+        .rpc('duplicate_event_with_children', {
+          source_event_id: sourceEventId,
+          target_event_date: options.eventDate ?? null,
+          target_event_name: options.eventName ?? null,
+          due_date_offset: options.dueDateOffset ?? null,
+        });
+
+      if (error) throw error;
+
+      if (!duplicatedEventId) {
+        return null;
+      }
+
+      const { data: eventRow, error: eventError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('event_id', duplicatedEventId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (eventError) throw eventError;
+
+      const newEvent = dbEventToEvent(eventRow as EventRow);
+      set((state) => ({
+        events: [newEvent, ...state.events.filter((event) => event.event_id !== newEvent.event_id)],
+      }));
+
+      return duplicatedEventId as string;
+    } catch (error) {
+      console.error('Error duplicating event with children:', error);
+      return null;
+    }
+  },
 
   // Team Member actions
   fetchTeamMembers: async () => {
@@ -922,6 +1067,410 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
           : [...DEFAULT_ASSIGNMENT_CATEGORIES],
       };
     });
+  },
+
+  // Task categories
+  fetchTaskCategories: async () => {
+    set({ isTaskCategoriesLoading: true });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        set({ taskCategories: [] });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('task_categories')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('sort_order')
+        .order('name');
+
+      if (error) throw error;
+
+      const categories = (data as TaskCategoryRow[]).map(dbTaskCategoryToTaskCategory);
+      set({ taskCategories: categories });
+    } catch (error) {
+      console.error('Error fetching task categories:', error);
+    } finally {
+      set({ isTaskCategoriesLoading: false });
+    }
+  },
+
+  createTaskCategory: async ({ name, color, sort_order }) => {
+    const normalizedName = normalizeCategoryName(name);
+    if (!normalizedName) {
+      throw new Error('Task category name is required');
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    const insertData = {
+      user_id: user.id,
+      name: normalizedName,
+      color: normalizeHexColor(color ?? null),
+      sort_order: typeof sort_order === 'number' ? sort_order : get().taskCategories.length + 1,
+    } satisfies Database['public']['Tables']['task_categories']['Insert'];
+
+    try {
+      const { data, error } = await supabase
+        .from('task_categories')
+        .insert(insertData)
+        .select('*')
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Task category already exists.');
+        }
+        throw error;
+      }
+
+      const newCategory = dbTaskCategoryToTaskCategory(data as TaskCategoryRow);
+      set((state) => ({
+        taskCategories: [...state.taskCategories, newCategory].sort((a, b) => {
+          if (a.sort_order === b.sort_order) {
+            return a.name.localeCompare(b.name);
+          }
+          return a.sort_order - b.sort_order;
+        }),
+      }));
+
+      return newCategory;
+    } catch (error) {
+      console.error('Error creating task category:', error);
+      throw error;
+    }
+  },
+
+  updateTaskCategory: async (categoryId, updates) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    const payload: Database['public']['Tables']['task_categories']['Update'] = {};
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+      const normalizedName = normalizeCategoryName(updates.name ?? '');
+      if (!normalizedName) {
+        throw new Error('Task category name is required');
+      }
+      payload.name = normalizedName;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'color')) {
+      payload.color = normalizeHexColor(updates.color ?? null);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'sort_order') && typeof updates.sort_order === 'number') {
+      payload.sort_order = updates.sort_order;
+    }
+
+    if (!Object.keys(payload).length) {
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('task_categories')
+      .update(payload)
+      .eq('category_id', categoryId)
+      .eq('user_id', user.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('Task category already exists.');
+      }
+      throw error;
+    }
+
+    const updatedCategory = dbTaskCategoryToTaskCategory(data as TaskCategoryRow);
+    set((state) => ({
+      taskCategories: state.taskCategories
+        .map((category) => (category.category_id === categoryId ? updatedCategory : category))
+        .sort((a, b) => {
+          if (a.sort_order === b.sort_order) {
+            return a.name.localeCompare(b.name);
+          }
+          return a.sort_order - b.sort_order;
+        }),
+    }));
+  },
+
+  deleteTaskCategory: async (categoryId) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    const { error } = await supabase
+      .from('task_categories')
+      .delete()
+      .eq('category_id', categoryId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      throw error;
+    }
+
+    set((state) => ({
+      taskCategories: state.taskCategories.filter((category) => category.category_id !== categoryId),
+    }));
+  },
+
+  reorderTaskCategories: async (updates) => {
+    if (!updates.length) {
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    for (const update of updates) {
+      const { error } = await supabase
+        .from('task_categories')
+        .update({ sort_order: update.sort_order })
+        .eq('category_id', update.category_id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        throw error;
+      }
+    }
+
+    set((state) => ({
+      taskCategories: state.taskCategories
+        .map((category) => {
+          const match = updates.find((entry) => entry.category_id === category.category_id);
+          return match ? { ...category, sort_order: match.sort_order } : category;
+        })
+        .sort((a, b) => {
+          if (a.sort_order === b.sort_order) {
+            return a.name.localeCompare(b.name);
+          }
+          return a.sort_order - b.sort_order;
+        }),
+    }));
+  },
+
+  // Event task actions
+  fetchEventTasks: async (eventId) => {
+    set({ isEventTasksLoading: true });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('event_tasks')
+        .select('*')
+        .eq('event_id', eventId)
+        .eq('user_id', user.id)
+        .order('sort_order');
+
+      if (error) throw error;
+
+      const tasks = (data as EventTaskRow[]).map(dbEventTaskToEventTask);
+      set((state) => ({
+        eventTasks: [
+          ...state.eventTasks.filter((task) => task.event_id !== eventId),
+          ...tasks,
+        ],
+      }));
+    } catch (error) {
+      console.error('Error fetching event tasks:', error);
+    } finally {
+      set({ isEventTasksLoading: false });
+    }
+  },
+
+  createEventTask: async (eventId, task) => {
+    const title = task.title?.trim();
+    if (!title) {
+      throw new Error('Task title is required');
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const nextSortOrder = task.sort_order ?? (get().getEventTasks(eventId).length + 1);
+
+      const insertData: Database['public']['Tables']['event_tasks']['Insert'] = {
+        event_id: eventId,
+        user_id: user.id,
+        title,
+        description: task.description?.trim() || null,
+        status: task.status ?? DEFAULT_TASK_STATUS,
+        due_date: task.due_date || null,
+        due_time: task.due_time ? task.due_time : null,
+        assignee_id: task.assignee_id || null,
+        category_id: task.category_id || null,
+        sort_order: nextSortOrder,
+      };
+
+      const { data, error } = await supabase
+        .from('event_tasks')
+        .insert(insertData)
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      const newTask = dbEventTaskToEventTask(data as EventTaskRow);
+      set((state) => ({
+        eventTasks: [
+          ...state.eventTasks,
+          newTask,
+        ],
+      }));
+
+      return newTask;
+    } catch (error) {
+      console.error('Error creating event task:', error);
+      return null;
+    }
+  },
+
+  updateEventTask: async (taskId, updates) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const payload: Database['public']['Tables']['event_tasks']['Update'] = {};
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'title')) {
+        const trimmedTitle = updates.title?.trim() ?? '';
+        if (!trimmedTitle) {
+          throw new Error('Task title is required');
+        }
+        payload.title = trimmedTitle;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'description')) {
+        payload.description = updates.description?.trim() || null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'status')) {
+        payload.status = updates.status ?? DEFAULT_TASK_STATUS;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'due_date')) {
+        payload.due_date = updates.due_date || null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'due_time')) {
+        payload.due_time = updates.due_time || null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'assignee_id')) {
+        payload.assignee_id = updates.assignee_id || null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'category_id')) {
+        payload.category_id = updates.category_id || null;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(updates, 'sort_order') && typeof updates.sort_order === 'number') {
+        payload.sort_order = updates.sort_order;
+      }
+
+      if (!Object.keys(payload).length) {
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('event_tasks')
+        .update(payload)
+        .eq('task_id', taskId)
+        .eq('user_id', user.id)
+        .select('*')
+        .single();
+
+      if (error) throw error;
+
+      const updatedTask = dbEventTaskToEventTask(data as EventTaskRow);
+      set((state) => ({
+        eventTasks: state.eventTasks.map((task) =>
+          task.task_id === taskId ? updatedTask : task,
+        ),
+      }));
+    } catch (error) {
+      console.error('Error updating event task:', error);
+      throw error;
+    }
+  },
+
+  deleteEventTask: async (taskId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('event_tasks')
+        .delete()
+        .eq('task_id', taskId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      set((state) => ({
+        eventTasks: state.eventTasks.filter((task) => task.task_id !== taskId),
+      }));
+    } catch (error) {
+      console.error('Error deleting event task:', error);
+      throw error;
+    }
+  },
+
+  reorderEventTasks: async (eventId, updates) => {
+    if (!updates.length) {
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('event_tasks')
+          .update({ sort_order: update.sort_order })
+          .eq('task_id', update.task_id)
+          .eq('user_id', user.id)
+          .eq('event_id', eventId);
+
+        if (error) throw error;
+      }
+
+      set((state) => ({
+        eventTasks: state.eventTasks.map((task) => {
+          const match = updates.find((entry) => entry.task_id === task.task_id);
+          return match ? { ...task, sort_order: match.sort_order } : task;
+        }),
+      }));
+    } catch (error) {
+      console.error('Error reordering event tasks:', error);
+      throw error;
+    }
+  },
+
+  getEventTasks: (eventId) => {
+    const { eventTasks } = get();
+    return eventTasks
+      .filter((task) => task.event_id === eventId)
+      .sort((a, b) => {
+        if (a.sort_order === b.sort_order) {
+          return a.created_at.localeCompare(b.created_at);
+        }
+        return a.sort_order - b.sort_order;
+      });
   },
 
   // Loading states

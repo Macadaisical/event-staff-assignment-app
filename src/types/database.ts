@@ -249,12 +249,96 @@ export interface Database {
           created_at?: string;
         };
       };
+      task_categories: {
+        Row: {
+          category_id: string;
+          user_id: string;
+          name: string;
+          color: string;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          category_id?: string;
+          user_id: string;
+          name: string;
+          color?: string;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          category_id?: string;
+          user_id?: string;
+          name?: string;
+          color?: string;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      event_tasks: {
+        Row: {
+          task_id: string;
+          event_id: string;
+          user_id: string;
+          title: string;
+          description: string | null;
+          status: 'Not Started' | 'In Progress' | 'Completed';
+          due_date: string | null;
+          due_time: string | null;
+          assignee_id: string | null;
+          category_id: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          task_id?: string;
+          event_id: string;
+          user_id: string;
+          title: string;
+          description?: string | null;
+          status?: 'Not Started' | 'In Progress' | 'Completed';
+          due_date?: string | null;
+          due_time?: string | null;
+          assignee_id?: string | null;
+          category_id?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          task_id?: string;
+          event_id?: string;
+          user_id?: string;
+          title?: string;
+          description?: string | null;
+          status?: 'Not Started' | 'In Progress' | 'Completed';
+          due_date?: string | null;
+          due_time?: string | null;
+          assignee_id?: string | null;
+          category_id?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      duplicate_event_with_children: {
+        Args: {
+          source_event_id: string;
+          target_event_date?: string | null;
+          target_event_name?: string | null;
+          due_date_offset?: number | null;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       [_ in never]: never;
