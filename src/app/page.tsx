@@ -13,13 +13,16 @@ import {
   Loader2,
   TrafficCone,
   Tag,
+  AlertCircle,
+  Clock,
+  TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 import { useAuth } from '@/components/auth/auth-provider';
 import LoginForm from '@/components/auth/login-form';
 import { useSupabaseStore } from '@/stores/supabase-store';
-import type { Event, TeamAssignment, TrafficControl, Supervisor } from '@/types';
+import type { Event, TeamAssignment, TrafficControl, Supervisor, EventTask, TaskStatus } from '@/types';
 
 interface CollapsibleSectionProps {
   title: string;
@@ -148,12 +151,14 @@ export default function DashboardPage() {
     teamAssignments,
     trafficControls,
     supervisors,
+    eventTasks,
     fetchEvents,
     fetchTeamMembers,
     fetchAssignmentCategories,
     fetchTeamAssignments,
     fetchTrafficControls,
     fetchSupervisors,
+    fetchEventTasks,
     isEventLoading,
     isTeamMembersLoading,
   } = useSupabaseStore();
@@ -210,8 +215,11 @@ export default function DashboardPage() {
       fetchSupervisors(event.event_id).catch((error: unknown) => {
         console.error('Error loading supervisors:', error);
       });
+      fetchEventTasks(event.event_id).catch((error: unknown) => {
+        console.error('Error loading event tasks:', error);
+      });
     });
-  }, [user, events, fetchTeamAssignments, fetchTrafficControls, fetchSupervisors]);
+  }, [user, events, fetchTeamAssignments, fetchTrafficControls, fetchSupervisors, fetchEventTasks]);
 
   const teamMemberById = useMemo(() => {
     const map = new Map<string, string>();
@@ -332,6 +340,52 @@ export default function DashboardPage() {
   }, [trafficByEvent, upcomingEvents, teamMemberById]);
 
   const categoriesSidebar = useMemo(() => assignmentCategories.slice(0, 8), [assignmentCategories]);
+
+  const overdueTasks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return eventTasks
+      .filter(task => {
+        if (task.status === 'Completed') return false;
+        if (!task.due_date) return false;
+        const dueDate = new Date(task.due_date);
+        dueDate.setHours(0, 0, 0, 0);
+        return dueDate < today;
+      })
+      .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
+  }, [eventTasks]);
+
+  const upcomingDeadlines = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDaysFromNow = new Date(today);
+    sevenDaysFromNow.setDate(today.getDate() + 7);
+
+    return eventTasks
+      .filter(task => {
+        if (!task.due_date) return false;
+        const dueDate = new Date(task.due_date);
+        dueDate.setHours(0, 0, 0, 0);
+        return dueDate >= today && dueDate <= sevenDaysFromNow;
+      })
+      .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
+  }, [eventTasks]);
+
+  const eventReadiness = useMemo(() => {
+    const readinessMap = new Map<string, { completed: number; total: number; score: number }>();
+
+    events.forEach(event => {
+      const tasks = eventTasks.filter(task => task.event_id === event.event_id);
+      const total = tasks.length;
+      const completed = tasks.filter(task => task.status === 'Completed').length;
+      const score = total > 0 ? Math.round((completed / total) * 100) : 100;
+
+      readinessMap.set(event.event_id, { completed, total, score });
+    });
+
+    return readinessMap;
+  }, [events, eventTasks]);
 
   const isLoadingDashboard = authLoading || (user ? isEventLoading || isTeamMembersLoading : false);
 
@@ -487,6 +541,140 @@ export default function DashboardPage() {
                 Monitor upcoming events, confirm team coverage, and keep traffic control coordinated—all from one place.
               </p>
             </div>
+
+            <section className="mb-14">
+              <div className="mb-6">
+                <h3 className="text-2xl font-semibold uppercase tracking-wide text-[#e9d29a]">
+                  Task Overview
+                </h3>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-3">
+                {/* Overdue Tasks Widget */}
+                <Link
+                  href="/calendar"
+                  className="group rounded-3xl border border-red-500/30 bg-gradient-to-br from-[rgba(185,28,28,0.25)] via-[rgba(127,29,29,0.2)] to-[rgba(185,28,28,0.15)] p-6 shadow-[0_18px_36px_rgba(185,28,28,0.25)] transition hover:shadow-[0_22px_40px_rgba(185,28,28,0.35)]"
+                >
+                  <div className="flex items-start justify-between">
+                    <AlertCircle className="h-8 w-8 text-red-400" />
+                    <span className="rounded-full bg-red-500/30 px-3 py-1 text-xs font-bold text-red-200">
+                      {overdueTasks.length}
+                    </span>
+                  </div>
+                  <h4 className="mt-4 text-lg font-semibold text-white">Overdue Tasks</h4>
+                  <p className="mt-2 text-sm text-red-100">
+                    {overdueTasks.length === 0
+                      ? 'All tasks on track'
+                      : `${overdueTasks.length} task${overdueTasks.length === 1 ? '' : 's'} past deadline`}
+                  </p>
+                  {overdueTasks.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {overdueTasks.slice(0, 3).map(task => {
+                        const event = events.find(e => e.event_id === task.event_id);
+                        return (
+                          <div key={task.task_id} className="rounded-xl border border-red-500/20 bg-red-500/10 p-3">
+                            <p className="text-sm font-medium text-white">{task.title}</p>
+                            <p className="text-xs text-red-200">
+                              {event?.event_name} • Due {formatShortDate(task.due_date)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                      {overdueTasks.length > 3 && (
+                        <p className="text-xs text-red-300">+{overdueTasks.length - 3} more overdue</p>
+                      )}
+                    </div>
+                  )}
+                </Link>
+
+                {/* Upcoming Deadlines Widget */}
+                <Link
+                  href="/calendar"
+                  className="group rounded-3xl border border-yellow-500/30 bg-gradient-to-br from-[rgba(234,179,8,0.25)] via-[rgba(161,98,7,0.2)] to-[rgba(234,179,8,0.15)] p-6 shadow-[0_18px_36px_rgba(234,179,8,0.25)] transition hover:shadow-[0_22px_40px_rgba(234,179,8,0.35)]"
+                >
+                  <div className="flex items-start justify-between">
+                    <Clock className="h-8 w-8 text-yellow-400" />
+                    <span className="rounded-full bg-yellow-500/30 px-3 py-1 text-xs font-bold text-yellow-200">
+                      {upcomingDeadlines.length}
+                    </span>
+                  </div>
+                  <h4 className="mt-4 text-lg font-semibold text-white">Upcoming Deadlines</h4>
+                  <p className="mt-2 text-sm text-yellow-100">
+                    {upcomingDeadlines.length === 0
+                      ? 'No tasks due this week'
+                      : `${upcomingDeadlines.length} task${upcomingDeadlines.length === 1 ? '' : 's'} due in next 7 days`}
+                  </p>
+                  {upcomingDeadlines.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {upcomingDeadlines.slice(0, 3).map(task => {
+                        const event = events.find(e => e.event_id === task.event_id);
+                        return (
+                          <div key={task.task_id} className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3">
+                            <p className="text-sm font-medium text-white">{task.title}</p>
+                            <p className="text-xs text-yellow-200">
+                              {event?.event_name} • Due {formatShortDate(task.due_date)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                      {upcomingDeadlines.length > 3 && (
+                        <p className="text-xs text-yellow-300">+{upcomingDeadlines.length - 3} more upcoming</p>
+                      )}
+                    </div>
+                  )}
+                </Link>
+
+                {/* Event Readiness Widget */}
+                <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-[rgba(16,185,129,0.25)] via-[rgba(5,150,105,0.2)] to-[rgba(16,185,129,0.15)] p-6 shadow-[0_18px_36px_rgba(16,185,129,0.25)]">
+                  <div className="flex items-start justify-between">
+                    <TrendingUp className="h-8 w-8 text-emerald-400" />
+                  </div>
+                  <h4 className="mt-4 text-lg font-semibold text-white">Event Readiness</h4>
+                  <p className="mt-2 text-sm text-emerald-100">
+                    Task completion across upcoming events
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    {upcomingEvents.slice(0, 4).map(event => {
+                      const readiness = eventReadiness.get(event.event_id) || { completed: 0, total: 0, score: 100 };
+                      return (
+                        <Link
+                          key={event.event_id}
+                          href={`/events/${event.event_id}?tab=tasks`}
+                          className="block rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 transition hover:bg-emerald-500/20"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-white truncate">{event.event_name}</span>
+                            <span className={`text-xs font-bold ${
+                              readiness.score >= 80 ? 'text-emerald-300' :
+                              readiness.score >= 50 ? 'text-yellow-300' :
+                              'text-red-300'
+                            }`}>
+                              {readiness.score}%
+                            </span>
+                          </div>
+                          <div className="mt-2 h-2 rounded-full bg-white/20">
+                            <div
+                              className={`h-2 rounded-full ${
+                                readiness.score >= 80 ? 'bg-emerald-400' :
+                                readiness.score >= 50 ? 'bg-yellow-400' :
+                                'bg-red-400'
+                              }`}
+                              style={{ width: `${readiness.score}%` }}
+                            />
+                          </div>
+                          <p className="mt-1 text-xs text-emerald-200">
+                            {readiness.completed}/{readiness.total} tasks completed
+                          </p>
+                        </Link>
+                      );
+                    })}
+                    {upcomingEvents.length === 0 && (
+                      <p className="text-sm text-emerald-200">No upcoming events</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
 
             <section className="mb-14">
               <div className="mb-6 flex items-center justify-between">
