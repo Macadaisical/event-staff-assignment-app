@@ -22,6 +22,11 @@ export default function SettingsPage() {
     addAssignmentCategory,
     updateAssignmentCategory,
     deleteAssignmentCategory,
+    taskCategories,
+    fetchTaskCategories,
+    createTaskCategory,
+    updateTaskCategory,
+    deleteTaskCategory,
   } = useSupabaseStore();
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -31,11 +36,26 @@ export default function SettingsPage() {
   const [editingName, setEditingName] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
 
+  const [isAddingTaskCategory, setIsAddingTaskCategory] = useState(false);
+  const [newTaskCategoryName, setNewTaskCategoryName] = useState('');
+  const [newTaskCategoryColor, setNewTaskCategoryColor] = useState('#3b82f6');
+  const [taskCategoryError, setTaskCategoryError] = useState<string | null>(null);
+  const [editingTaskCategory, setEditingTaskCategory] = useState<string | null>(null);
+  const [editingTaskCategoryName, setEditingTaskCategoryName] = useState('');
+  const [editingTaskCategoryColor, setEditingTaskCategoryColor] = useState('');
+  const [isSavingTaskCategory, setIsSavingTaskCategory] = useState(false);
+
   useEffect(() => {
     fetchAssignmentCategories().catch((error: unknown) => {
       console.error('Error loading assignment categories:', error);
     });
   }, [fetchAssignmentCategories]);
+
+  useEffect(() => {
+    fetchTaskCategories().catch((error: unknown) => {
+      console.error('Error loading task categories:', error);
+    });
+  }, [fetchTaskCategories]);
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
@@ -107,6 +127,92 @@ export default function SettingsPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to delete category.';
       setCategoryError(message);
+    }
+  };
+
+  const handleAddTaskCategory = async () => {
+    if (!newTaskCategoryName.trim()) {
+      return;
+    }
+
+    setIsSavingTaskCategory(true);
+    setTaskCategoryError(null);
+
+    try {
+      await createTaskCategory({
+        name: newTaskCategoryName,
+        color: newTaskCategoryColor,
+      });
+      setNewTaskCategoryName('');
+      setNewTaskCategoryColor('#3b82f6');
+      setIsAddingTaskCategory(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to add task category.';
+      setTaskCategoryError(message);
+    } finally {
+      setIsSavingTaskCategory(false);
+    }
+  };
+
+  const startEditingTaskCategory = (categoryId: string) => {
+    const category = taskCategories.find((c) => c.category_id === categoryId);
+    if (!category) return;
+
+    setEditingTaskCategory(categoryId);
+    setEditingTaskCategoryName(category.name);
+    setEditingTaskCategoryColor(category.color);
+    setTaskCategoryError(null);
+  };
+
+  const cancelEditingTaskCategory = () => {
+    setEditingTaskCategory(null);
+    setEditingTaskCategoryName('');
+    setEditingTaskCategoryColor('');
+  };
+
+  const handleUpdateTaskCategory = async () => {
+    if (!editingTaskCategory) {
+      return;
+    }
+
+    if (!editingTaskCategoryName.trim()) {
+      setTaskCategoryError('Category name is required.');
+      return;
+    }
+
+    setIsSavingTaskCategory(true);
+    setTaskCategoryError(null);
+
+    try {
+      await updateTaskCategory(editingTaskCategory, {
+        name: editingTaskCategoryName,
+        color: editingTaskCategoryColor,
+      });
+      cancelEditingTaskCategory();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update task category.';
+      setTaskCategoryError(message);
+    } finally {
+      setIsSavingTaskCategory(false);
+    }
+  };
+
+  const handleDeleteTaskCategory = async (categoryId: string) => {
+    const category = taskCategories.find((c) => c.category_id === categoryId);
+    if (!confirm(`Delete task category "${category?.name}"? This cannot be undone.`)) {
+      return;
+    }
+
+    setTaskCategoryError(null);
+
+    try {
+      await deleteTaskCategory(categoryId);
+      if (editingTaskCategory === categoryId) {
+        cancelEditingTaskCategory();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete task category.';
+      setTaskCategoryError(message);
     }
   };
 
@@ -268,6 +374,176 @@ export default function SettingsPage() {
                         onClick={() => handleDeleteCategory(category)}
                         className="inline-flex items-center justify-center rounded-full bg-red-500/20 p-2 text-red-100 transition hover:bg-red-500/30"
                         aria-label={`Delete ${category}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {taskCategoryError && (
+          <div className="mb-8 rounded-3xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100 shadow-[0_10px_30px_rgba(185,28,28,0.25)]">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 h-4 w-4" />
+              <span>{taskCategoryError}</span>
+            </div>
+          </div>
+        )}
+
+        {isAddingTaskCategory && (
+          <section className="mb-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.55)] via-[rgba(0,36,53,0.42)] to-[rgba(0,36,53,0.32)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-[#e9d29a]">Add task category</h2>
+                <p className="mt-2 text-sm text-[#d0d6db]">Organize pre-event tasks into color-coded categories for better visibility and tracking.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsAddingTaskCategory(false);
+                  setNewTaskCategoryName('');
+                  setNewTaskCategoryColor('#3b82f6');
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </button>
+            </div>
+            <div className="mt-6 flex flex-col gap-3">
+              <div className="flex flex-col gap-3 md:flex-row">
+                <input
+                  type="text"
+                  value={newTaskCategoryName}
+                  onChange={(event) => setNewTaskCategoryName(event.target.value)}
+                  onKeyDown={(event) => event.key === 'Enter' && handleAddTaskCategory()}
+                  placeholder="e.g. Permits, Logistics, Outreach"
+                  className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-base text-white shadow-inner outline-none transition placeholder:text-[#9aa7b5] focus:border-[#e9d29a] focus:shadow-[0_0_0_2px_rgba(233,210,154,0.25)]"
+                  autoFocus
+                />
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={newTaskCategoryColor}
+                    onChange={(event) => setNewTaskCategoryColor(event.target.value)}
+                    className="h-12 w-12 cursor-pointer rounded-2xl border border-white/10 bg-white/10"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 md:w-auto">
+                <button
+                  onClick={handleAddTaskCategory}
+                  disabled={!newTaskCategoryName.trim() || isSavingTaskCategory}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500/80 to-emerald-600/80 px-6 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(16,185,129,0.3)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Check className="h-4 w-4" />
+                  {isSavingTaskCategory ? 'Saving…' : 'Save Category'}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAddingTaskCategory(false);
+                    setNewTaskCategoryName('');
+                    setNewTaskCategoryColor('#3b82f6');
+                  }}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white/10 px-6 py-3 text-sm font-semibold text-[#e6e7e8] transition hover:bg-white/15"
+                >
+                  <X className="h-4 w-4" />
+                  Close
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section className="mb-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-semibold text-[#e9d29a]">Task Categories</h2>
+              <p className="text-xs uppercase tracking-wide text-[#d0d6db]">
+                {taskCategories.length} category{taskCategories.length === 1 ? '' : 'ies'} for pre-event tasks
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setIsAddingTaskCategory(true);
+                setEditingTaskCategory(null);
+                setEditingTaskCategoryName('');
+                setEditingTaskCategoryColor('');
+                setTaskCategoryError(null);
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
+            >
+              <Plus className="h-4 w-4" />
+              Add Task Category
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {taskCategories.map((category) => (
+              <div
+                key={category.category_id}
+                className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-[#f5f6f7] shadow-[0_12px_28px_rgba(0,0,0,0.35)]"
+              >
+                {editingTaskCategory === category.category_id ? (
+                  <div className="flex flex-col gap-3">
+                    <input
+                      type="text"
+                      value={editingTaskCategoryName}
+                      onChange={(event) => setEditingTaskCategoryName(event.target.value)}
+                      onKeyDown={(event) => event.key === 'Enter' && handleUpdateTaskCategory()}
+                      className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:shadow-[0_0_0_2px_rgba(233,210,154,0.25)]"
+                    />
+                    <input
+                      type="color"
+                      value={editingTaskCategoryColor}
+                      onChange={(event) => setEditingTaskCategoryColor(event.target.value)}
+                      className="h-10 w-full cursor-pointer rounded-xl border border-white/10 bg-white/10"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={handleUpdateTaskCategory}
+                        disabled={isSavingTaskCategory}
+                        className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500/80 to-emerald-600/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Check className="h-4 w-4" />
+                        Save
+                      </button>
+                      <button
+                        onClick={cancelEditingTaskCategory}
+                        className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#e6e7e8] transition hover:bg-white/20"
+                      >
+                        <X className="h-4 w-4" />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="h-4 w-4 rounded-full"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <div>
+                        <p className="text-base font-medium text-white">{category.name}</p>
+                        <p className="mt-1 text-xs uppercase tracking-wide text-[#d0d6db]">Task grouping</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        onClick={() => startEditingTaskCategory(category.category_id)}
+                        className="inline-flex items-center justify-center rounded-full bg-white/10 p-2 text-[#e6e7e8] transition hover:bg-white/20"
+                        aria-label={`Edit ${category.name}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTaskCategory(category.category_id)}
+                        className="inline-flex items-center justify-center rounded-full bg-red-500/20 p-2 text-red-100 transition hover:bg-red-500/30"
+                        aria-label={`Delete ${category.name}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

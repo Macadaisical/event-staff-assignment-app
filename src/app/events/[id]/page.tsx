@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
   Calendar,
   Car,
-  ClipboardList,
   Clock,
   Edit,
   FileText,
@@ -15,15 +14,13 @@ import {
   ListChecks,
   ListTodo,
   MapPin,
-  Plus,
   ShieldCheck,
-  Trash2,
   Users,
 } from 'lucide-react';
 
 import { useSupabaseStore } from '@/stores/supabase-store';
 import { exportEventToPDF } from '@/utils/pdf-export';
-import type { TaskStatus } from '@/types';
+import { EventTaskBoard, type CreateTaskPayload } from '@/components/events/task-board';
 
 const parseEventDate = (value: string | null | undefined): Date | null => {
   if (!value) return null;
@@ -127,6 +124,9 @@ export default function EventDetailPage() {
     supervisors,
     taskCategories,
     fetchTaskCategories,
+    createTaskCategory,
+    updateTaskCategory,
+    deleteTaskCategory,
     eventTasks,
     fetchEventTasks,
     createEventTask,
@@ -137,19 +137,7 @@ export default function EventDetailPage() {
     isTaskCategoriesLoading,
   } = useSupabaseStore();
 
-  const [activeSection, setActiveSection] = useState('overview');
-  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [newTask, setNewTask] = useState({
-    title: '',
-    category_id: '',
-    assignee_id: '',
-    due_date: '',
-    due_time: '',
-    status: 'Not Started' as TaskStatus,
-    description: '',
-  });
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [taskStatusFilter, setTaskStatusFilter] = useState<'all' | TaskStatus>('all');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'staffing' | 'traffic' | 'documents'>('overview');
   const [isDuplicatingEvent, setIsDuplicatingEvent] = useState(false);
 
   useEffect(() => {
@@ -242,121 +230,43 @@ export default function EventDetailPage() {
       });
   }, [eventId, eventTasks]);
 
-  const filteredTasks = useMemo(() => {
-    if (taskStatusFilter === 'all') {
-      return eventTaskList;
-    }
-    return eventTaskList.filter((task) => task.status === taskStatusFilter);
-  }, [eventTaskList, taskStatusFilter]);
-
-  const taskStatusCounts = useMemo(() => {
-    return eventTaskList.reduce(
-      (acc, task) => {
-        acc.total += 1;
-        acc[task.status] = (acc[task.status] ?? 0) + 1;
-        return acc;
-      },
-      { total: eventTaskList.length, 'Not Started': 0, 'In Progress': 0, Completed: 0 } as Record<'total' | TaskStatus, number>,
-    );
-  }, [eventTaskList]);
-
-  const sections = useMemo(
+  const tabs = useMemo(
     () => [
-      { id: 'overview', label: 'Overview', icon: Calendar },
-      { id: 'pre-event-tasks', label: 'Pre-Event Tasks', icon: ListChecks },
-      { id: 'staffing', label: 'Staffing', icon: Users },
-      { id: 'traffic', label: 'Traffic', icon: Car },
-      { id: 'documents', label: 'Documents', icon: FileText },
+      { id: 'overview' as const, label: 'Overview', icon: Calendar },
+      { id: 'tasks' as const, label: 'Pre-Event Tasks', icon: ListChecks },
+      { id: 'staffing' as const, label: 'Staffing', icon: Users },
+      { id: 'traffic' as const, label: 'Traffic', icon: Car },
+      { id: 'documents' as const, label: 'Documents', icon: FileText },
     ],
     [],
   );
 
-  const TASK_STATUS_OPTIONS: TaskStatus[] = ['Not Started', 'In Progress', 'Completed'];
-  const TASK_STATUS_FILTERS: Array<{ id: 'all' | TaskStatus; label: string }> = [
-    { id: 'all', label: 'All' },
-    { id: 'Not Started', label: 'Not Started' },
-    { id: 'In Progress', label: 'In Progress' },
-    { id: 'Completed', label: 'Completed' },
-  ];
-
-  const registerSectionRef = (id: string) => (element: HTMLDivElement | null) => {
-    sectionRefs.current[id] = element;
-  };
-
-  const handleSectionClick = (id: string) => {
-    setActiveSection(id);
-    const target = sectionRefs.current[id];
-    if (target) {
-      const offsetTop = target.getBoundingClientRect().top + window.scrollY - 96;
-      window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-    }
-  };
-
-  const resetNewTask = () => {
-    setNewTask({
-      title: '',
-      category_id: '',
-      assignee_id: '',
-      due_date: '',
-      due_time: '',
-      status: 'Not Started',
-      description: '',
-    });
-  };
-
-  const handleNewTaskFieldChange = (field: keyof typeof newTask, value: string) => {
-    setNewTask((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-  };
-
-  const handleCreateTask = async (eventInstance: React.FormEvent<HTMLFormElement>) => {
-    eventInstance.preventDefault();
+  const handleCreateTaskWrapper = async (task: CreateTaskPayload) => {
     if (!eventId) return;
-    const trimmedTitle = newTask.title.trim();
-    if (!trimmedTitle) {
-      return;
-    }
-
-    setIsCreatingTask(true);
-    try {
-      await createEventTask(eventId, {
-        title: trimmedTitle,
-        status: newTask.status,
-        due_date: newTask.due_date || null,
-        due_time: newTask.due_time || null,
-        assignee_id: newTask.assignee_id || null,
-        category_id: newTask.category_id || null,
-        sort_order: eventTaskList.length + 1,
-        description: newTask.description.trim() || null,
-      });
-      resetNewTask();
-      setTaskStatusFilter('all');
-    } catch (error) {
-      console.error('Error creating task:', error);
-    } finally {
-      setIsCreatingTask(false);
-    }
+    await createEventTask(eventId, task);
   };
 
-  const handleTaskUpdate = async (taskId: string, updates: Parameters<typeof updateEventTask>[1]) => {
-    try {
-      await updateEventTask(taskId, updates);
-    } catch (error) {
-      console.error('Error updating task:', error);
-    }
+  const handleUpdateTaskWrapper = async (taskId: string, updates: Partial<typeof eventTasks[0]>) => {
+    await updateEventTask(taskId, updates);
   };
 
-  const handleTaskDelete = async (taskId: string) => {
-    if (!window.confirm('Remove this pre-event task?')) {
-      return;
-    }
-    try {
-      await deleteEventTask(taskId);
-    } catch (error) {
-      console.error('Error deleting task:', error);
-    }
+  const handleDeleteTaskWrapper = async (taskId: string) => {
+    await deleteEventTask(taskId);
+  };
+
+  const handleCreateCategoryWrapper = async (input: { name: string; color?: string }) => {
+    return await createTaskCategory(input);
+  };
+
+  const handleUpdateCategoryWrapper = async (
+    categoryId: string,
+    updates: { name?: string; color?: string; sort_order?: number },
+  ) => {
+    await updateTaskCategory(categoryId, updates);
+  };
+
+  const handleDeleteCategoryWrapper = async (categoryId: string) => {
+    await deleteTaskCategory(categoryId);
   };
 
   const handleDuplicateEvent = async () => {
@@ -377,43 +287,6 @@ export default function EventDetailPage() {
     } finally {
       setIsDuplicatingEvent(false);
     }
-  };
-
-  const getTaskCategory = (categoryId: string | null) => {
-    if (!categoryId) return undefined;
-    return taskCategories.find((category) => category.category_id === categoryId);
-  };
-
-  const getTaskCategoryLabel = (categoryId: string | null) => {
-    const match = getTaskCategory(categoryId);
-    return match ? match.name : 'Uncategorized';
-  };
-
-  const getTaskCategoryColor = (categoryId: string | null) => {
-    const match = getTaskCategory(categoryId);
-    return match ? match.color : '#64748B';
-  };
-
-  const getTaskDueDateLabel = (dueDate: string | null, dueTime: string | null) => {
-    if (!dueDate && !dueTime) {
-      return 'No deadline';
-    }
-    const parts: string[] = [];
-    const parsedDate = parseEventDate(dueDate ?? undefined);
-    if (parsedDate) {
-      parts.push(parsedDate.toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }));
-    }
-    if (dueTime) {
-      const formatted = formatTime(dueTime);
-      if (formatted) {
-        parts.push(formatted);
-      }
-    }
-    return parts.length ? parts.join(' • ') : 'No deadline';
   };
 
   const getMemberName = (memberId: string | null | undefined): string => {
@@ -472,17 +345,27 @@ export default function EventDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#001a24] via-[#003446] to-[#002233] text-slate-100">
-      <main className="mx-auto w-full max-w-6xl px-6 py-12 lg:px-10">
-        <nav className="mb-10 flex flex-wrap gap-3 overflow-x-auto pb-2">
-          {sections.map(({ id, label, icon: Icon }) => (
+      <main className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-10">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <Link
+            href="/events"
+            className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Events
+          </Link>
+        </div>
+
+        <nav className="mb-10 flex flex-wrap gap-3 overflow-x-auto border-b border-white/10 pb-2">
+          {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
-              onClick={() => handleSectionClick(id)}
-              className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
-                activeSection === id
-                  ? 'border-[#e9d29a] bg-[#e9d29a]/20 text-[#e9d29a]'
-                  : 'border-white/10 bg-white/5 text-[#d0d6db] hover:border-[#e9d29a]/40 hover:text-[#e9d29a]'
+              onClick={() => setActiveTab(id)}
+              className={`inline-flex items-center gap-2 rounded-t-xl border-b-2 px-4 py-2 text-sm font-semibold transition ${
+                activeTab === id
+                  ? 'border-[#e9d29a] bg-white/10 text-[#e9d29a]'
+                  : 'border-transparent bg-transparent text-[#d0d6db] hover:border-[#e9d29a]/40 hover:text-[#e9d29a]'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -491,18 +374,12 @@ export default function EventDetailPage() {
           ))}
         </nav>
 
-        <section ref={registerSectionRef('overview')} id="overview" className="mb-16 space-y-12">
+        {activeTab === 'overview' && (
+        <section id="overview" className="space-y-12">
           <div className="overflow-hidden rounded-3xl border border-[#004d66] bg-gradient-to-r from-white/10 via-white/5 to-transparent p-8 text-[#f5f6f7] shadow-[0_20px_50px_rgba(0,0,0,0.35)] backdrop-blur">
             <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center gap-4">
-                  <Link
-                    href="/events"
-                    className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
-                  >
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                    Back to Events
-                  </Link>
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusBadge}`}>{statusLabel}</span>
                 </div>
 
@@ -611,288 +488,27 @@ export default function EventDetailPage() {
             </Link>
           </div>
         </section>
+        )}
 
-        <section
-          ref={registerSectionRef('pre-event-tasks')}
-          id="pre-event-tasks"
-          className="mb-16 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#e9d29a]">
-                <ListChecks className="h-4 w-4" />
-                Pre-Event Tasks
-              </div>
-              <h2 className="mt-4 text-2xl font-semibold text-white">Stay ahead of event readiness</h2>
-              <p className="mt-2 max-w-xl text-sm text-[#d0d6db]">
-                Capture permits, outreach, and setup tasks so the team arrives ready. Assign owners, due dates, and track status without
-                leaving the workspace.
-              </p>
-            </div>
+        {activeTab === 'tasks' && eventId && (
+          <EventTaskBoard
+            eventId={eventId}
+            tasks={eventTaskList}
+            categories={taskCategories}
+            teamMembers={teamMembers}
+            isLoading={isEventTasksLoading}
+            isCategoryLoading={isTaskCategoriesLoading}
+            onCreateTask={handleCreateTaskWrapper}
+            onUpdateTask={handleUpdateTaskWrapper}
+            onDeleteTask={handleDeleteTaskWrapper}
+            onCreateCategory={handleCreateCategoryWrapper}
+            onUpdateCategory={handleUpdateCategoryWrapper}
+            onDeleteCategory={handleDeleteCategoryWrapper}
+          />
+        )}
 
-            <div className="flex flex-col gap-1 text-xs uppercase tracking-wide text-[#d0d6db]">
-              <span>Total: {taskStatusCounts.total}</span>
-              <span className="text-[#f4b942]">In Progress: {taskStatusCounts['In Progress']}</span>
-              <span className="text-emerald-200">Completed: {taskStatusCounts.Completed}</span>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap gap-2">
-              {TASK_STATUS_FILTERS.map(({ id, label }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setTaskStatusFilter(id)}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
-                    taskStatusFilter === id
-                      ? 'border-[#e9d29a] bg-[#e9d29a]/20 text-[#e9d29a]'
-                      : 'border-white/10 bg-white/5 text-[#d0d6db] hover:border-[#e9d29a]/40 hover:text-[#e9d29a]'
-                  }`}
-                >
-                  {label}
-                  {id === 'all' ? null : <span className="text-[10px] text-[#94a7b5]">{taskStatusCounts[id]}</span>}
-                </button>
-              ))}
-            </div>
-            {isEventTasksLoading ? <p className="text-xs uppercase tracking-wide text-[#d0d6db]">Syncing tasks...</p> : null}
-          </div>
-
-          <form onSubmit={handleCreateTask} className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="grid gap-4 md:grid-cols-5">
-              <div className="md:col-span-2">
-                <label className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Task title</label>
-                <input
-                  required
-                  value={newTask.title}
-                  onChange={(eventInstance) => handleNewTaskFieldChange('title', eventInstance.target.value)}
-                  placeholder="e.g. Finalize road closure permits"
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:ring-2 focus:ring-[#e9d29a]/30"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Category</label>
-                <select
-                  value={newTask.category_id}
-                  onChange={(eventInstance) => handleNewTaskFieldChange('category_id', eventInstance.target.value)}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:ring-2 focus:ring-[#e9d29a]/30"
-                >
-                  <option value="">Uncategorized</option>
-                  {taskCategories.map((category) => (
-                    <option key={category.category_id} value={category.category_id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Assignee</label>
-                <select
-                  value={newTask.assignee_id}
-                  onChange={(eventInstance) => handleNewTaskFieldChange('assignee_id', eventInstance.target.value)}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:ring-2 focus:ring-[#e9d29a]/30"
-                >
-                  <option value="">Unassigned</option>
-                  {teamMembers
-                    .filter((member) => member.active)
-                    .map((member) => (
-                      <option key={member.member_id} value={member.member_id}>
-                        {member.member_name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Status</label>
-                <select
-                  value={newTask.status}
-                  onChange={(eventInstance) => handleNewTaskFieldChange('status', eventInstance.target.value)}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:ring-2 focus:ring-[#e9d29a]/30"
-                >
-                  {TASK_STATUS_OPTIONS.map((statusOption) => (
-                    <option key={statusOption} value={statusOption}>
-                      {statusOption}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-4 md:grid-cols-4">
-              <div>
-                <label className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Due date</label>
-                <input
-                  type="date"
-                  value={newTask.due_date}
-                  onChange={(eventInstance) => handleNewTaskFieldChange('due_date', eventInstance.target.value)}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:ring-2 focus:ring-[#e9d29a]/30"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Due time</label>
-                <input
-                  type="time"
-                  value={newTask.due_time}
-                  onChange={(eventInstance) => handleNewTaskFieldChange('due_time', eventInstance.target.value)}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:ring-2 focus:ring-[#e9d29a]/30"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Details (optional)</label>
-                <textarea
-                  value={newTask.description}
-                  onChange={(eventInstance) => handleNewTaskFieldChange('description', eventInstance.target.value)}
-                  placeholder="Add quick context or links"
-                  className="mt-2 h-20 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:ring-2 focus:ring-[#e9d29a]/30"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs uppercase tracking-wide text-[#94a7b5]">Press enter to capture a new task</p>
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#004d66] to-[#003446] px-4 py-2 text-sm font-semibold text-[#e6e7e8] transition hover:opacity-90 disabled:opacity-50"
-                disabled={isCreatingTask}
-              >
-                {isCreatingTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Add Task
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-8 grid gap-4">
-            {!filteredTasks.length && !isEventTasksLoading ? (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 p-6 text-sm text-[#d0d6db]">
-                No pre-event tasks yet. Capture outreach, logistics, and follow-ups to keep the team aligned.
-              </div>
-            ) : null}
-
-            {filteredTasks.map((task) => (
-              <div key={task.task_id} className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-[#d0d6db]">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">{task.title}</h3>
-                    <p className="mt-1 text-xs uppercase tracking-wide text-[#94a7b5]">
-                      Owner: <span className="text-[#f5f6f7]">{getMemberName(task.assignee_id)}</span>
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <select
-                      value={task.status}
-                      onChange={(eventInstance) =>
-                        handleTaskUpdate(task.task_id, { status: eventInstance.target.value as TaskStatus })
-                      }
-                      className="rounded-full border border-white/10 bg-[#001a24]/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#e9d29a] outline-none transition focus:border-[#e9d29a]"
-                    >
-                      {TASK_STATUS_OPTIONS.map((statusOption) => (
-                        <option key={statusOption} value={statusOption}>
-                          {statusOption}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => handleTaskDelete(task.task_id)}
-                      className="rounded-full border border-white/10 p-2 text-[#f5c6c6] transition hover:border-[#f5c6c6] hover:text-white"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-4">
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: getTaskCategoryColor(task.category_id) }}
-                    />
-                    <div className="w-full">
-                      <p className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Category</p>
-                      <select
-                        value={task.category_id ?? ''}
-                        onChange={(eventInstance) =>
-                          handleTaskUpdate(task.task_id, {
-                            category_id: eventInstance.target.value ? eventInstance.target.value : null,
-                          })
-                        }
-                        className="mt-1 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-xs text-white outline-none transition focus:border-[#e9d29a]"
-                      >
-                        <option value="">Uncategorized</option>
-                        {taskCategories.map((category) => (
-                          <option key={category.category_id} value={category.category_id}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Due date</p>
-                    <input
-                      type="date"
-                      value={task.due_date ?? ''}
-                      onChange={(eventInstance) =>
-                        handleTaskUpdate(task.task_id, {
-                          due_date: eventInstance.target.value || null,
-                        })
-                      }
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-xs text-white outline-none transition focus:border-[#e9d29a]"
-                    />
-                    <p className="mt-2 text-[11px] text-[#d0d6db]">{getTaskDueDateLabel(task.due_date, task.due_time)}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Due time</p>
-                    <input
-                      type="time"
-                      value={task.due_time ?? ''}
-                      onChange={(eventInstance) =>
-                        handleTaskUpdate(task.task_id, {
-                          due_time: eventInstance.target.value || null,
-                        })
-                      }
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-xs text-white outline-none transition focus:border-[#e9d29a]"
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-[#94a7b5]">Assignee</p>
-                    <select
-                      value={task.assignee_id ?? ''}
-                      onChange={(eventInstance) =>
-                        handleTaskUpdate(task.task_id, {
-                          assignee_id: eventInstance.target.value || null,
-                        })
-                      }
-                      className="mt-1 w-full rounded-xl border border-white/10 bg-[#001a24]/60 px-3 py-2 text-xs text-white outline-none transition focus:border-[#e9d29a]"
-                    >
-                      <option value="">Unassigned</option>
-                      {teamMembers
-                        .filter((member) => member.active)
-                        .map((member) => (
-                          <option key={member.member_id} value={member.member_id}>
-                            {member.member_name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-
-                {task.description ? (
-                  <p className="mt-4 text-sm text-[#cbd5db]">{task.description}</p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section
-          ref={registerSectionRef('staffing')}
-          id="staffing"
-          className="mb-16 space-y-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-        >
+        {activeTab === 'staffing' && (
+          <section id="staffing" className="space-y-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold text-[#e9d29a]">Staffing Overview</h2>
@@ -977,12 +593,10 @@ export default function EventDetailPage() {
             </div>
           </div>
         </section>
+        )}
 
-        <section
-          ref={registerSectionRef('traffic')}
-          id="traffic"
-          className="mb-16 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-        >
+        {activeTab === 'traffic' && (
+        <section id="traffic" className="rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold text-[#e9d29a]">Traffic Control</h2>
@@ -1026,12 +640,10 @@ export default function EventDetailPage() {
             </div>
           )}
         </section>
+        )}
 
-        <section
-          ref={registerSectionRef('documents')}
-          id="documents"
-          className="rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]"
-        >
+        {activeTab === 'documents' && (
+        <section id="documents" className="rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.45)] via-[rgba(0,36,53,0.35)] to-[rgba(0,36,53,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-2xl font-semibold text-[#e9d29a]">Documents & Reporting</h2>
@@ -1060,6 +672,7 @@ export default function EventDetailPage() {
             </div>
           </div>
         </section>
+        )}
       </main>
     </div>
   );
