@@ -442,12 +442,21 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Get source event to determine event name if not provided
+      const { data: sourceEvent } = await supabase
+        .from('events')
+        .select('event_name')
+        .eq('event_id', sourceEventId)
+        .single();
+
+      const newEventName = options.eventName || `${sourceEvent?.event_name || 'Event'} (Copy)`;
+      const dateOffsetDays = options.dueDateOffset || 0;
+
       const { data: duplicatedEventId, error } = await supabase
-        .rpc('duplicate_event_with_children', {
-          source_event_id: sourceEventId,
-          target_event_date: options.eventDate ?? null,
-          target_event_name: options.eventName ?? null,
-          due_date_offset: options.dueDateOffset ?? null,
+        .rpc('duplicate_event_with_tasks', {
+          p_event_id: sourceEventId,
+          p_new_event_name: newEventName,
+          p_date_offset_days: dateOffsetDays,
         });
 
       if (error) throw error;

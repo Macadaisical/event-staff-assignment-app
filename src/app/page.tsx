@@ -22,7 +22,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/components/auth/auth-provider';
 import LoginForm from '@/components/auth/login-form';
 import { useSupabaseStore } from '@/stores/supabase-store';
-import type { Event, TeamAssignment, TrafficControl, Supervisor, EventTask, TaskStatus } from '@/types';
+import type { Event, TeamAssignment, TrafficControl, Supervisor } from '@/types';
 
 interface CollapsibleSectionProps {
   title: string;

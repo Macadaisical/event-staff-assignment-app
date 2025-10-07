@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarDays, Users, Settings, Home, Menu, X, Calendar } from 'lucide-react';
+import { CalendarDays, Users, Settings, Home, Menu, X, Calendar, History } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: Home },
   { name: 'Calendar', href: '/calendar', icon: CalendarDays },
   { name: 'Events', href: '/events', icon: Calendar },
+  { name: 'History', href: '/events/history', icon: History },
   { name: 'Team Members', href: '/team-members', icon: Users },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

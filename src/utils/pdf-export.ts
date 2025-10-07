@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import type { Event, TeamMember, TeamAssignment, TrafficControl, Supervisor } from '@/types';
+import type { Event, TeamMember, TeamAssignment, TrafficControl, Supervisor, EventTask, TaskCategory } from '@/types';
 
 interface PDFExportData {
   event: Event;
@@ -7,6 +7,8 @@ interface PDFExportData {
   teamAssignments?: TeamAssignment[];
   trafficControls?: TrafficControl[];
   supervisors?: Supervisor[];
+  eventTasks?: EventTask[];
+  taskCategories?: TaskCategory[];
 }
 
 const safeText = (value: string | null | undefined, fallback = 'Not specified'): string => {
@@ -27,7 +29,7 @@ const safeTimeRange = (start: string | null | undefined, end: string | null | un
 };
 
 export function exportEventToPDF(data: PDFExportData): void {
-  const { event, teamMembers, teamAssignments = [], trafficControls = [], supervisors = [] } = data;
+  const { event, teamMembers, teamAssignments = [], trafficControls = [], supervisors = [], eventTasks = [], taskCategories = [] } = data;
 
   const doc = new jsPDF();
   let yPos = 20;
@@ -202,6 +204,104 @@ export function exportEventToPDF(data: PDFExportData): void {
     doc.setFont('helvetica', 'italic');
     doc.text('No traffic control assignments', leftMargin, yPos);
     yPos += 10;
+  }
+
+  // Pre-Event Tasks Summary
+  if (eventTasks.length > 0) {
+    checkPageBreak(80);
+    addSection('Pre-Event Tasks Summary');
+
+    const totalTasks = eventTasks.length;
+    const completedTasks = eventTasks.filter(t => t.status === 'Completed').length;
+    const inProgressTasks = eventTasks.filter(t => t.status === 'In Progress').length;
+    const notStartedTasks = eventTasks.filter(t => t.status === 'Not Started').length;
+    const readinessScore = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 100;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const overdueTasks = eventTasks.filter(task => {
+      if (task.status === 'Completed' || !task.due_date) return false;
+      const dueDate = new Date(task.due_date);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate < today;
+    });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    addField('Total Tasks', String(totalTasks));
+    addField('Completed', `${completedTasks} (${readinessScore}%)`);
+    addField('In Progress', String(inProgressTasks));
+    addField('Not Started', String(notStartedTasks));
+
+    if (overdueTasks.length > 0) {
+      doc.setTextColor(220, 38, 38);
+      addField('Overdue Tasks', String(overdueTasks.length));
+      doc.setTextColor(0, 0, 0);
+    }
+
+    yPos += 5;
+
+    const tasksByStatus = [
+      { status: 'Completed', tasks: eventTasks.filter(t => t.status === 'Completed'), color: [34, 197, 94] },
+      { status: 'In Progress', tasks: eventTasks.filter(t => t.status === 'In Progress'), color: [59, 130, 246] },
+      { status: 'Not Started', tasks: eventTasks.filter(t => t.status === 'Not Started'), color: [156, 163, 175] }
+    ];
+
+    tasksByStatus.forEach(({ status, tasks, color }) => {
+      if (tasks.length > 0) {
+        checkPageBreak(30);
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(color[0], color[1], color[2]);
+        doc.text(`${status} (${tasks.length})`, leftMargin, yPos);
+        doc.setTextColor(0, 0, 0);
+        yPos += 8;
+
+        tasks.forEach(task => {
+          checkPageBreak(20);
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+
+          const isOverdue = task.status !== 'Completed' && task.due_date && new Date(task.due_date) < today;
+          if (isOverdue) {
+            doc.setTextColor(220, 38, 38);
+          }
+
+          doc.text(`• ${task.title}`, leftMargin + 5, yPos);
+          yPos += 5;
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+
+          if (task.category_id) {
+            const category = taskCategories.find(c => c.category_id === task.category_id);
+            if (category) {
+              doc.text(`  Category: ${category.name}`, leftMargin + 10, yPos);
+              yPos += 4;
+            }
+          }
+
+          if (task.due_date) {
+            const dueText = isOverdue ? `  Due: ${safeDate(task.due_date)} (OVERDUE)` : `  Due: ${safeDate(task.due_date)}`;
+            doc.text(dueText, leftMargin + 10, yPos);
+            yPos += 4;
+          }
+
+          if (task.assignee_id) {
+            const assignee = teamMembers.find(m => m.member_id === task.assignee_id);
+            if (assignee) {
+              doc.text(`  Assigned to: ${assignee.member_name}`, leftMargin + 10, yPos);
+              yPos += 4;
+            }
+          }
+
+          doc.setTextColor(0, 0, 0);
+          yPos += 3;
+        });
+
+        yPos += 5;
+      }
+    });
   }
 
   // Footer

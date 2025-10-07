@@ -8,6 +8,7 @@ import {
   Calendar,
   Car,
   Clock,
+  Copy,
   Edit,
   FileText,
   Loader2,
@@ -21,6 +22,7 @@ import {
 import { useSupabaseStore } from '@/stores/supabase-store';
 import { exportEventToPDF } from '@/utils/pdf-export';
 import { EventTaskBoard, type CreateTaskPayload } from '@/components/events/task-board';
+import DuplicateEventDialog from '@/components/events/duplicate-event-dialog';
 
 const parseEventDate = (value: string | null | undefined): Date | null => {
   if (!value) return null;
@@ -138,6 +140,7 @@ export default function EventDetailPage() {
   } = useSupabaseStore();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'staffing' | 'traffic' | 'documents'>('overview');
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [isDuplicatingEvent, setIsDuplicatingEvent] = useState(false);
 
   useEffect(() => {
@@ -303,7 +306,32 @@ export default function EventDetailPage() {
       teamAssignments: eventAssignments,
       trafficControls: eventTraffic,
       supervisors: eventSupervisors,
+      eventTasks: eventTaskList,
+      taskCategories,
     });
+  };
+
+  const handleDuplicate = async (newEventName: string, dateOffsetDays: number): Promise<boolean> => {
+    if (!event) return false;
+
+    setIsDuplicatingEvent(true);
+    try {
+      const newEventId = await duplicateEventWithChildren(event.event_id, {
+        eventName: newEventName,
+        dueDateOffset: dateOffsetDays,
+      });
+
+      if (newEventId) {
+        router.push(`/events/${newEventId}`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error duplicating event:', error);
+      return false;
+    } finally {
+      setIsDuplicatingEvent(false);
+    }
   };
 
   if (!event && isEventLoading) {
@@ -649,14 +677,25 @@ export default function EventDetailPage() {
               <h2 className="text-2xl font-semibold text-[#e9d29a]">Documents & Reporting</h2>
               <p className="text-sm text-[#d0d6db]">Package the event plan or duplicate it to start a new season.</p>
             </div>
-            <button
-              type="button"
-              onClick={handleExport}
-              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
-            >
-              <FileText className="h-4 w-4" />
-              Export PDF
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleExport}
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-[#e9d29a] transition hover:bg-white/20"
+              >
+                <FileText className="h-4 w-4" />
+                Export PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDuplicateDialogOpen(true)}
+                disabled={isDuplicatingEvent}
+                className="inline-flex items-center gap-2 rounded-full bg-blue-600/20 px-4 py-2 text-sm font-semibold uppercase tracking-wide text-blue-300 transition hover:bg-blue-600/30 disabled:opacity-50"
+              >
+                <Copy className="h-4 w-4" />
+                Duplicate
+              </button>
+            </div>
           </div>
 
           <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -674,6 +713,19 @@ export default function EventDetailPage() {
         </section>
         )}
       </main>
+
+      {event && (
+        <DuplicateEventDialog
+          isOpen={isDuplicateDialogOpen}
+          onClose={() => setIsDuplicateDialogOpen(false)}
+          event={event}
+          taskCount={eventTaskList.length}
+          assignmentCount={eventAssignments.length}
+          supervisorCount={eventSupervisors.length}
+          trafficCount={eventTraffic.length}
+          onDuplicate={handleDuplicate}
+        />
+      )}
     </div>
   );
 }
