@@ -145,67 +145,6 @@ export function exportEventToPDF(data: PDFExportData): void {
     yPos += 10;
   }
 
-  // Team Assignments
-  checkPageBreak(60);
-  addSection('Team Assignments');
-  if (teamAssignments.length > 0) {
-    const assignmentHeaders = ['Team Member', 'Assignment', 'Equipment/Area', 'Time', 'Notes'];
-    const assignmentWidths = [40, 35, 35, 35, 35];
-
-    addTableHeader(assignmentHeaders, assignmentWidths);
-
-    teamAssignments.forEach(assignment => {
-      const member = teamMembers.find(m => m.member_id === assignment.member_id);
-      const memberName = member ? member.member_name : 'Unknown Member';
-      const timeRange = safeTimeRange(assignment.start_time, assignment.end_time);
-
-      checkPageBreak(15);
-      addTableRow([
-        memberName,
-        safeText(assignment.assignment_type, '—'),
-        safeText(assignment.equipment_area, '—'),
-        timeRange,
-        safeText(assignment.notes, '—')
-      ], assignmentWidths);
-    });
-  } else {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'italic');
-    doc.text('No team assignments', leftMargin, yPos);
-    yPos += 10;
-  }
-
-  // Traffic Control
-  checkPageBreak(60);
-  addSection('Traffic Control');
-  if (trafficControls.length > 0) {
-    const trafficHeaders = ['Staff Member', 'Patrol Vehicle', 'Area Assignment'];
-    const trafficWidths = [60, 60, 60];
-
-    addTableHeader(trafficHeaders, trafficWidths);
-
-    trafficControls.forEach(traffic => {
-      const memberName = traffic.staff_name && traffic.staff_name.trim().length
-        ? traffic.staff_name.trim()
-        : (() => {
-            const member = teamMembers.find(m => m.member_id === traffic.member_id);
-            return member ? member.member_name : 'Not specified';
-          })();
-
-      checkPageBreak(15);
-      addTableRow([
-        memberName,
-        safeText(traffic.patrol_vehicle, '—'),
-        safeText(traffic.area_assignment, '—')
-      ], trafficWidths);
-    });
-  } else {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'italic');
-    doc.text('No traffic control assignments', leftMargin, yPos);
-    yPos += 10;
-  }
-
   // Pre-Event Tasks Summary
   if (eventTasks.length > 0) {
     checkPageBreak(80);
@@ -302,6 +241,67 @@ export function exportEventToPDF(data: PDFExportData): void {
         yPos += 5;
       }
     });
+  }
+
+  // Team Assignments
+  checkPageBreak(60);
+  addSection('Team Assignments');
+  if (teamAssignments.length > 0) {
+    const assignmentHeaders = ['Team Member', 'Assignment', 'Equipment/Area', 'Time', 'Notes'];
+    const assignmentWidths = [40, 35, 35, 35, 35];
+
+    addTableHeader(assignmentHeaders, assignmentWidths);
+
+    teamAssignments.forEach(assignment => {
+      const member = teamMembers.find(m => m.member_id === assignment.member_id);
+      const memberName = member ? member.member_name : 'Unknown Member';
+      const timeRange = safeTimeRange(assignment.start_time, assignment.end_time);
+
+      checkPageBreak(15);
+      addTableRow([
+        memberName,
+        safeText(assignment.assignment_type, '—'),
+        safeText(assignment.equipment_area, '—'),
+        timeRange,
+        safeText(assignment.notes, '—')
+      ], assignmentWidths);
+    });
+  } else {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'italic');
+    doc.text('No team assignments', leftMargin, yPos);
+    yPos += 10;
+  }
+
+  // Traffic Control
+  checkPageBreak(60);
+  addSection('Traffic Control');
+  if (trafficControls.length > 0) {
+    const trafficHeaders = ['Staff Member', 'Patrol Vehicle', 'Area Assignment'];
+    const trafficWidths = [60, 60, 60];
+
+    addTableHeader(trafficHeaders, trafficWidths);
+
+    trafficControls.forEach(traffic => {
+      const memberName = traffic.staff_name && traffic.staff_name.trim().length
+        ? traffic.staff_name.trim()
+        : (() => {
+            const member = teamMembers.find(m => m.member_id === traffic.member_id);
+            return member ? member.member_name : 'Not specified';
+          })();
+
+      checkPageBreak(15);
+      addTableRow([
+        memberName,
+        safeText(traffic.patrol_vehicle, '—'),
+        safeText(traffic.area_assignment, '—')
+      ], trafficWidths);
+    });
+  } else {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'italic');
+    doc.text('No traffic control assignments', leftMargin, yPos);
+    yPos += 10;
   }
 
   // Footer

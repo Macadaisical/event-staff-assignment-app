@@ -97,11 +97,11 @@ BEGIN
   -- Duplicate traffic control
   FOR v_traffic_record IN
     SELECT member_id, staff_name, patrol_vehicle, area_assignment, sort_order
-    FROM public.traffic_control
+    FROM public.traffic_controls
     WHERE event_id = p_event_id
     ORDER BY sort_order
   LOOP
-    INSERT INTO public.traffic_control (event_id, member_id, staff_name, patrol_vehicle,
+    INSERT INTO public.traffic_controls (event_id, member_id, staff_name, patrol_vehicle,
                                         area_assignment, sort_order)
     VALUES (v_new_event_id, v_traffic_record.member_id, v_traffic_record.staff_name,
             v_traffic_record.patrol_vehicle, v_traffic_record.area_assignment,
