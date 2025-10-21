@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 import { useSupabaseStore } from '@/stores/supabase-store';
+import DatabaseDiagnostics from '@/components/debug/database-diagnostics';
 
 export default function SettingsPage() {
   const {
@@ -584,6 +585,11 @@ export default function SettingsPage() {
               <dd className="mt-2 text-base font-medium text-white">Supabase-backed Zustand store</dd>
             </div>
           </dl>
+        </section>
+
+        {/* Temporary Database Diagnostics */}
+        <section className="rounded-3xl border border-yellow-500/20 bg-yellow-500/5 p-6">
+          <DatabaseDiagnostics />
         </section>
 
         <section className="rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(30,64,175,0.35)] via-[rgba(15,52,92,0.32)] to-[rgba(4,31,56,0.28)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(10,28,61,0.45)]">

@@ -57,7 +57,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(session?.user || null);
         setLoading(false);
 
-        // Create profile if user just signed up
+        // Ensure profile exists (backup to database trigger)
+        // The database trigger should handle this automatically, but this provides
+        // a client-side fallback in case the trigger hasn't been applied yet
         if (event === 'SIGNED_IN' && session?.user) {
           const profileData = {
             id: session.user.id,
@@ -72,6 +74,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           if (error) {
             console.error('Error creating/updating profile:', error);
+            console.error('Profile data attempted:', profileData);
+            console.error('User should still have access if database trigger is working');
+
+            // Verify profile exists
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { data: profile, error: fetchError } = await (supabase as any)
+              .from('profiles')
+              .select('id')
+              .eq('id', session.user.id)
+              .single();
+
+            if (fetchError || !profile) {
+              console.error('CRITICAL: Profile does not exist for user:', session.user.id);
+              console.error('Please run the latest database migration to fix profile creation');
+            } else {
+              console.log('Profile exists despite upsert error - database trigger is working');
+            }
           }
         }
       }
