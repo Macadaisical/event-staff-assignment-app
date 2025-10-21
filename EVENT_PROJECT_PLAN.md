@@ -1,3 +1,4 @@
+
 # Event Operations Feature Roadmap
 
 This document tracks the multi-phase rollout that will transform the Event Staff app into a full event-planning and management platform.

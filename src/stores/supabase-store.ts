@@ -310,7 +310,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data, error } = await supabase
         .from('events')
         .select('*')
-        .eq('user_id', user.id)
         .order('event_date', { ascending: false });
 
       if (error) throw error;
@@ -496,7 +495,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data, error } = await supabase
         .from('team_members')
         .select('*')
-        .eq('user_id', user.id)
         .order('member_name');
 
       if (error) throw error;
@@ -947,7 +945,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data, error } = await supabase
         .from('assignment_categories')
         .select('category_name')
-        .eq('user_id', user.id)
         .order('category_name');
 
       if (error) throw error;
@@ -1091,7 +1088,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       const { data, error } = await supabase
         .from('task_categories')
         .select('*')
-        .eq('user_id', user.id)
         .order('sort_order')
         .order('name');
 
@@ -1280,7 +1276,6 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         .from('event_tasks')
         .select('*')
         .eq('event_id', eventId)
-        .eq('user_id', user.id)
         .order('sort_order');
 
       if (error) throw error;
