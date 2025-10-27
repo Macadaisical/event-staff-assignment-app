@@ -192,6 +192,13 @@ interface SupabaseStore {
   eventTasks: EventTask[];
   isEventTasksLoading: boolean;
 
+  // Cache timestamps for data freshness
+  lastFetchTimestamps: {
+    events: number | null;
+    teamMembers: number | null;
+    assignmentCategories: number | null;
+  };
+
   // Event actions
   fetchEvents: () => Promise<void>;
   addEvent: (event: Omit<Event, 'event_id' | 'created_at'>) => Promise<Event | null>;
@@ -212,18 +219,21 @@ interface SupabaseStore {
 
   // Assignment actions
   fetchTeamAssignments: (eventId: string) => Promise<void>;
+  fetchTeamAssignmentsBatch: (eventIds: string[]) => Promise<void>;
   addTeamAssignments: (eventId: string, assignments: Omit<TeamAssignment, 'assignment_id' | 'event_id'>[]) => Promise<void>;
   replaceTeamAssignments: (eventId: string, assignments: Omit<TeamAssignment, 'assignment_id' | 'event_id'>[]) => Promise<void>;
   getTeamAssignments: (eventId: string) => TeamAssignment[];
 
   // Traffic Control actions
   fetchTrafficControls: (eventId: string) => Promise<void>;
+  fetchTrafficControlsBatch: (eventIds: string[]) => Promise<void>;
   addTrafficControls: (eventId: string, controls: Omit<TrafficControl, 'traffic_id' | 'event_id'>[]) => Promise<void>;
   replaceTrafficControls: (eventId: string, controls: Omit<TrafficControl, 'traffic_id' | 'event_id'>[]) => Promise<void>;
   getTrafficControls: (eventId: string) => TrafficControl[];
 
   // Supervisor actions
   fetchSupervisors: (eventId: string) => Promise<void>;
+  fetchSupervisorsBatch: (eventIds: string[]) => Promise<void>;
   replaceSupervisors: (eventId: string, supervisors: Omit<Supervisor, 'supervisor_id' | 'event_id'>[]) => Promise<void>;
   getSupervisors: (eventId: string) => Supervisor[];
 
@@ -245,6 +255,7 @@ interface SupabaseStore {
 
   // Event task actions
   fetchEventTasks: (eventId: string) => Promise<void>;
+  fetchEventTasksBatch: (eventIds: string[]) => Promise<void>;
   createEventTask: (
     eventId: string,
     task: {
@@ -283,6 +294,8 @@ interface SupabaseStore {
   setIsTeamMembersLoading: (loading: boolean) => void;
 }
 
+const CACHE_DURATION_MS = 30000; // 30 seconds cache
+
 export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   // Initial state
   user: null,
@@ -300,8 +313,22 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   eventTasks: [],
   isEventTasksLoading: false,
 
+  lastFetchTimestamps: {
+    events: null,
+    teamMembers: null,
+    assignmentCategories: null,
+  },
+
   // Event actions
   fetchEvents: async () => {
+    const now = Date.now();
+    const { lastFetchTimestamps } = get();
+
+    // Check cache freshness
+    if (lastFetchTimestamps.events && (now - lastFetchTimestamps.events) < CACHE_DURATION_MS) {
+      return; // Data is fresh, skip fetch
+    }
+
     set({ isEventLoading: true });
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -315,7 +342,13 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       if (error) throw error;
 
       const events = data.map(dbEventToEvent);
-      set({ events });
+      set({
+        events,
+        lastFetchTimestamps: {
+          ...get().lastFetchTimestamps,
+          events: Date.now(),
+        },
+      });
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
@@ -487,6 +520,14 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
 
   // Team Member actions
   fetchTeamMembers: async () => {
+    const now = Date.now();
+    const { lastFetchTimestamps } = get();
+
+    // Check cache freshness
+    if (lastFetchTimestamps.teamMembers && (now - lastFetchTimestamps.teamMembers) < CACHE_DURATION_MS) {
+      return; // Data is fresh, skip fetch
+    }
+
     set({ isTeamMembersLoading: true });
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -500,7 +541,13 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       if (error) throw error;
 
       const teamMembers = data.map(dbTeamMemberToTeamMember);
-      set({ teamMembers });
+      set({
+        teamMembers,
+        lastFetchTimestamps: {
+          ...get().lastFetchTimestamps,
+          teamMembers: Date.now(),
+        },
+      });
     } catch (error) {
       console.error('Error fetching team members:', error);
     } finally {
@@ -620,6 +667,33 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       }));
     } catch (error) {
       console.error('Error fetching team assignments:', error);
+    }
+  },
+
+  fetchTeamAssignmentsBatch: async (eventIds) => {
+    if (!eventIds.length) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('team_assignments')
+        .select('*')
+        .in('event_id', eventIds)
+        .order('sort_order');
+
+      if (error) throw error;
+
+      const assignments = data.map(dbTeamAssignmentToTeamAssignment);
+      set((state) => ({
+        teamAssignments: [
+          ...state.teamAssignments.filter(a => !eventIds.includes(a.event_id)),
+          ...assignments
+        ]
+      }));
+    } catch (error) {
+      console.error('Error fetching team assignments batch:', error);
     }
   },
 
@@ -748,6 +822,33 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       }));
     } catch (error) {
       console.error('Error fetching traffic controls:', error);
+    }
+  },
+
+  fetchTrafficControlsBatch: async (eventIds) => {
+    if (!eventIds.length) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('traffic_controls')
+        .select('*')
+        .in('event_id', eventIds)
+        .order('sort_order');
+
+      if (error) throw error;
+
+      const controls = data.map(dbTrafficControlToTrafficControl);
+      set((state) => ({
+        trafficControls: [
+          ...state.trafficControls.filter(c => !eventIds.includes(c.event_id)),
+          ...controls
+        ]
+      }));
+    } catch (error) {
+      console.error('Error fetching traffic controls batch:', error);
     }
   },
 
@@ -881,6 +982,33 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
     }
   },
 
+  fetchSupervisorsBatch: async (eventIds) => {
+    if (!eventIds.length) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('supervisors')
+        .select('*')
+        .in('event_id', eventIds)
+        .order('sort_order');
+
+      if (error) throw error;
+
+      const supervisors = data.map(dbSupervisorToSupervisor);
+      set((state) => ({
+        supervisors: [
+          ...state.supervisors.filter(s => !eventIds.includes(s.event_id)),
+          ...supervisors
+        ]
+      }));
+    } catch (error) {
+      console.error('Error fetching supervisors batch:', error);
+    }
+  },
+
   replaceSupervisors: async (eventId, supervisorData) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -935,6 +1063,14 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
 
   // Assignment categories
   fetchAssignmentCategories: async () => {
+    const now = Date.now();
+    const { lastFetchTimestamps } = get();
+
+    // Check cache freshness
+    if (lastFetchTimestamps.assignmentCategories && (now - lastFetchTimestamps.assignmentCategories) < CACHE_DURATION_MS) {
+      return; // Data is fresh, skip fetch
+    }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -959,7 +1095,13 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
         categoryRows.map(({ category_name }) => category_name ?? ''),
       );
 
-      set({ assignmentCategories: categories });
+      set({
+        assignmentCategories: categories,
+        lastFetchTimestamps: {
+          ...get().lastFetchTimestamps,
+          assignmentCategories: Date.now(),
+        },
+      });
     } catch (error) {
       console.error('Error fetching assignment categories:', error);
       set({ assignmentCategories: [...DEFAULT_ASSIGNMENT_CATEGORIES] });
@@ -1289,6 +1431,36 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       }));
     } catch (error) {
       console.error('Error fetching event tasks:', error);
+    } finally {
+      set({ isEventTasksLoading: false });
+    }
+  },
+
+  fetchEventTasksBatch: async (eventIds) => {
+    if (!eventIds.length) return;
+
+    set({ isEventTasksLoading: true });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('event_tasks')
+        .select('*')
+        .in('event_id', eventIds)
+        .order('sort_order');
+
+      if (error) throw error;
+
+      const tasks = (data as EventTaskRow[]).map(dbEventTaskToEventTask);
+      set((state) => ({
+        eventTasks: [
+          ...state.eventTasks.filter((task) => !eventIds.includes(task.event_id)),
+          ...tasks,
+        ],
+      }));
+    } catch (error) {
+      console.error('Error fetching event tasks batch:', error);
     } finally {
       set({ isEventTasksLoading: false });
     }

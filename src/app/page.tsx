@@ -155,10 +155,10 @@ export default function DashboardPage() {
     fetchEvents,
     fetchTeamMembers,
     fetchAssignmentCategories,
-    fetchTeamAssignments,
-    fetchTrafficControls,
-    fetchSupervisors,
-    fetchEventTasks,
+    fetchTeamAssignmentsBatch,
+    fetchTrafficControlsBatch,
+    fetchSupervisorsBatch,
+    fetchEventTasksBatch,
     isEventLoading,
     isTeamMembersLoading,
   } = useSupabaseStore();
@@ -199,27 +199,26 @@ export default function DashboardPage() {
       })
       .slice(0, 6);
 
-    eventsToHydrate.forEach((event) => {
-      if (hydratedEventIdsRef.current.has(event.event_id)) {
-        return;
-      }
+    const eventIdsToFetch = eventsToHydrate
+      .filter((event) => !hydratedEventIdsRef.current.has(event.event_id))
+      .map((event) => event.event_id);
 
-      hydratedEventIdsRef.current.add(event.event_id);
+    if (eventIdsToFetch.length === 0) {
+      return;
+    }
 
-      fetchTeamAssignments(event.event_id).catch((error: unknown) => {
-        console.error('Error loading assignments:', error);
-      });
-      fetchTrafficControls(event.event_id).catch((error: unknown) => {
-        console.error('Error loading traffic controls:', error);
-      });
-      fetchSupervisors(event.event_id).catch((error: unknown) => {
-        console.error('Error loading supervisors:', error);
-      });
-      fetchEventTasks(event.event_id).catch((error: unknown) => {
-        console.error('Error loading event tasks:', error);
-      });
+    eventIdsToFetch.forEach((id) => hydratedEventIdsRef.current.add(id));
+
+    // Batch fetch all related data in parallel using a single query per table
+    Promise.all([
+      fetchTeamAssignmentsBatch(eventIdsToFetch),
+      fetchTrafficControlsBatch(eventIdsToFetch),
+      fetchSupervisorsBatch(eventIdsToFetch),
+      fetchEventTasksBatch(eventIdsToFetch),
+    ]).catch((error: unknown) => {
+      console.error('Error loading event data:', error);
     });
-  }, [user, events, fetchTeamAssignments, fetchTrafficControls, fetchSupervisors, fetchEventTasks]);
+  }, [user, events, fetchTeamAssignmentsBatch, fetchTrafficControlsBatch, fetchSupervisorsBatch, fetchEventTasksBatch]);
 
   const teamMemberById = useMemo(() => {
     const map = new Map<string, string>();
