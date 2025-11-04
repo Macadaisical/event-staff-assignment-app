@@ -34,7 +34,9 @@ const DEFAULT_ASSIGNMENT_TYPE = 'General Support';
 const DEFAULT_EQUIPMENT_AREA = 'Assignment TBD';
 const DEFAULT_PATROL_VEHICLE = 'Vehicle TBD';
 const DEFAULT_AREA_ASSIGNMENT = 'Area TBD';
-const DEFAULT_ASSIGNMENT_CATEGORIES: AssignmentCategory[] = [
+// Note: Default categories are now seeded in database via migration
+// Keeping a simple fallback list for category names only
+const DEFAULT_CATEGORY_NAMES: string[] = [
   'Equipment Operator',
   'Safety Monitor',
   'Setup/Breakdown',
@@ -239,9 +241,22 @@ interface SupabaseStore {
 
   // Assignment categories
   fetchAssignmentCategories: () => Promise<void>;
-  addAssignmentCategory: (categoryName: string) => Promise<void>;
-  updateAssignmentCategory: (currentName: string, updatedName: string) => Promise<void>;
-  deleteAssignmentCategory: (categoryName: string) => Promise<void>;
+  addAssignmentCategory: (data: {
+    category_name: string;
+    parent_category_id?: string | null;
+    sort_order?: number;
+  }) => Promise<AssignmentCategory | null>;
+  updateAssignmentCategory: (
+    categoryId: string,
+    updates: {
+      category_name?: string;
+      parent_category_id?: string | null;
+      sort_order?: number;
+    }
+  ) => Promise<void>;
+  deleteAssignmentCategory: (categoryId: string) => Promise<void>;
+  getCategoryHierarchy: () => AssignmentCategory[];
+  reorderAssignmentCategories: (updates: { category_id: string; sort_order: number }[]) => Promise<void>;
 
   // Task categories
   fetchTaskCategories: () => Promise<void>;
@@ -304,7 +319,7 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
   isEventLoading: false,
   teamMembers: [],
   isTeamMembersLoading: false,
-  assignmentCategories: [...DEFAULT_ASSIGNMENT_CATEGORIES],
+  assignmentCategories: [], // Now loaded from database
   teamAssignments: [],
   trafficControls: [],
   supervisors: [],
@@ -1074,26 +1089,32 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        set({ assignmentCategories: [...DEFAULT_ASSIGNMENT_CATEGORIES] });
+        set({ assignmentCategories: [] });
         return;
       }
 
       const { data, error } = await supabase
         .from('assignment_categories')
-        .select('category_name')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order')
         .order('category_name');
 
       if (error) throw error;
 
-      if (!data || data.length === 0) {
-        set({ assignmentCategories: [...DEFAULT_ASSIGNMENT_CATEGORIES] });
-        return;
-      }
-
-      const categoryRows = data as { category_name: string | null }[];
-      const categories = dedupeAndSortCategories(
-        categoryRows.map(({ category_name }) => category_name ?? ''),
-      );
+      const categories = (data || []).map((row: unknown) => {
+        const cat = row as Record<string, unknown>;
+        return {
+          category_id: cat.category_id as string,
+          user_id: cat.user_id as string,
+          category_name: cat.category_name as string,
+          parent_category_id: cat.parent_category_id as string | null,
+          sort_order: cat.sort_order as number,
+          is_active: cat.is_active as boolean,
+          created_at: cat.created_at as string,
+          updated_at: cat.updated_at as string,
+        } as AssignmentCategory;
+      });
 
       set({
         assignmentCategories: categories,
@@ -1104,12 +1125,12 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       });
     } catch (error) {
       console.error('Error fetching assignment categories:', error);
-      set({ assignmentCategories: [...DEFAULT_ASSIGNMENT_CATEGORIES] });
+      set({ assignmentCategories: [] });
     }
   },
 
-  addAssignmentCategory: async (categoryName) => {
-    const normalizedName = normalizeCategoryName(categoryName);
+  addAssignmentCategory: async (data) => {
+    const normalizedName = normalizeCategoryName(data.category_name);
     if (!normalizedName) {
       throw new Error('Category name is required');
     }
@@ -1119,36 +1140,58 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       throw new Error('Not authenticated');
     }
 
-    const { error } = await supabase
+    // Get current max sort_order for this level
+    const { assignmentCategories } = get();
+    const siblingCategories = assignmentCategories.filter(
+      (cat) => cat.parent_category_id === (data.parent_category_id || null)
+    );
+    const maxSortOrder = siblingCategories.length > 0
+      ? Math.max(...siblingCategories.map(c => c.sort_order))
+      : 0;
+
+    const { data: newCategory, error } = await supabase
       .from('assignment_categories')
       .insert({
         user_id: user.id,
         category_name: normalizedName,
+        parent_category_id: data.parent_category_id || null,
+        sort_order: data.sort_order ?? maxSortOrder + 1,
+        is_active: true,
       })
-      .select('category_name')
+      .select('*')
       .single();
 
     if (error) {
       if (error.code === '23505') {
-        throw new Error('Category already exists.');
+        throw new Error('Category already exists at this level.');
       }
       throw error;
     }
 
+    const category: AssignmentCategory = {
+      category_id: newCategory.category_id,
+      user_id: newCategory.user_id,
+      category_name: newCategory.category_name,
+      parent_category_id: newCategory.parent_category_id,
+      sort_order: newCategory.sort_order,
+      is_active: newCategory.is_active,
+      created_at: newCategory.created_at,
+      updated_at: newCategory.updated_at,
+    };
+
     set((state) => ({
-      assignmentCategories: dedupeAndSortCategories([
-        ...state.assignmentCategories,
-        normalizedName,
-      ]),
+      assignmentCategories: [...state.assignmentCategories, category],
     }));
+
+    return category;
   },
 
-  updateAssignmentCategory: async (currentName, updatedName) => {
-    const existingName = normalizeCategoryName(currentName);
-    const normalizedName = normalizeCategoryName(updatedName);
-
-    if (!normalizedName) {
-      throw new Error('Category name is required');
+  updateAssignmentCategory: async (categoryId, updates) => {
+    if (updates.category_name) {
+      updates.category_name = normalizeCategoryName(updates.category_name);
+      if (!updates.category_name) {
+        throw new Error('Category name is required');
+      }
     }
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -1156,65 +1199,114 @@ export const useSupabaseStore = create<SupabaseStore>((set, get) => ({
       throw new Error('Not authenticated');
     }
 
-    const shouldPersist = existingName !== normalizedName;
+    const { data, error } = await supabase
+      .from('assignment_categories')
+      .update(updates)
+      .eq('category_id', categoryId)
+      .eq('user_id', user.id)
+      .select('*')
+      .single();
 
-    if (shouldPersist) {
-      const { data, error } = await supabase
-        .from('assignment_categories')
-        .update({ category_name: normalizedName })
-        .eq('user_id', user.id)
-        .eq('category_name', existingName)
-        .select('category_name');
-
-      if (error) {
-        if (error.code === '23505') {
-          throw new Error('Category already exists.');
-        }
-        throw error;
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('Category already exists at this level.');
       }
-
-      if (!data || data.length === 0) {
-        throw new Error('Category not found.');
-      }
+      throw error;
     }
 
+    const updatedCategory: AssignmentCategory = {
+      category_id: data.category_id,
+      user_id: data.user_id,
+      category_name: data.category_name,
+      parent_category_id: data.parent_category_id,
+      sort_order: data.sort_order,
+      is_active: data.is_active,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    };
+
     set((state) => ({
-      assignmentCategories: dedupeAndSortCategories(
-        state.assignmentCategories.map((name) =>
-          name.toLowerCase() === existingName.toLowerCase() ? normalizedName : name,
-        ),
+      assignmentCategories: state.assignmentCategories.map((cat) =>
+        cat.category_id === categoryId ? updatedCategory : cat
       ),
     }));
   },
 
-  deleteAssignmentCategory: async (categoryName) => {
-    const normalizedName = normalizeCategoryName(categoryName);
+  deleteAssignmentCategory: async (categoryId) => {
     const { data: { user } } = await supabase.auth.getUser();
-
     if (!user) {
       throw new Error('Not authenticated');
     }
 
+    // Delete will cascade to children via ON DELETE CASCADE
     const { error } = await supabase
       .from('assignment_categories')
       .delete()
-      .eq('user_id', user.id)
-      .eq('category_name', normalizedName);
+      .eq('category_id', categoryId)
+      .eq('user_id', user.id);
 
     if (error) {
       throw error;
     }
 
-    set((state) => {
-      const remaining = state.assignmentCategories.filter(
-        (name) => name.toLowerCase() !== normalizedName.toLowerCase(),
-      );
+    // Remove deleted category and its children from state
+    set((state) => ({
+      assignmentCategories: state.assignmentCategories.filter(
+        (cat) => cat.category_id !== categoryId && cat.parent_category_id !== categoryId
+      ),
+    }));
+  },
+
+  getCategoryHierarchy: () => {
+    const { assignmentCategories } = get();
+
+    // Build hierarchy tree
+    const rootCategories = assignmentCategories
+      .filter((cat) => !cat.parent_category_id)
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    const categoriesWithChildren = rootCategories.map((parent) => {
+      const children = assignmentCategories
+        .filter((cat) => cat.parent_category_id === parent.category_id)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((child) => ({
+          ...child,
+          depth_level: 1,
+          full_path: `${parent.category_name} > ${child.category_name}`,
+        }));
+
       return {
-        assignmentCategories: remaining.length
-          ? dedupeAndSortCategories(remaining)
-          : [...DEFAULT_ASSIGNMENT_CATEGORIES],
+        ...parent,
+        depth_level: 0,
+        full_path: parent.category_name,
+        children: children.length > 0 ? children : undefined,
       };
     });
+
+    return categoriesWithChildren;
+  },
+
+  reorderAssignmentCategories: async (updates) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('Not authenticated');
+    }
+
+    // Update sort_order for each category
+    for (const update of updates) {
+      const { error } = await supabase
+        .from('assignment_categories')
+        .update({ sort_order: update.sort_order })
+        .eq('category_id', update.category_id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        throw error;
+      }
+    }
+
+    // Refresh categories
+    await get().fetchAssignmentCategories();
   },
 
   // Task categories

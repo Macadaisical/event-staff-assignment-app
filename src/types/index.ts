@@ -88,7 +88,24 @@ export interface EventFormData extends Omit<Event, 'event_id' | 'created_at'> {
 }
 
 // Common types
-export type AssignmentCategory = string;
+// Legacy type for backward compatibility
+export type AssignmentCategoryName = string;
+
+// Enhanced hierarchical category structure
+export interface AssignmentCategory {
+  category_id: string;
+  user_id: string;
+  category_name: string;
+  parent_category_id: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // Computed fields for UI
+  children?: AssignmentCategory[];
+  depth_level?: number; // 0 = parent, 1 = child
+  full_path?: string; // e.g., "Technical Support > Camera Operator"
+}
 
 export interface SelectOption {
   value: string;
