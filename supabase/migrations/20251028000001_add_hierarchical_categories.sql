@@ -26,10 +26,16 @@ CREATE INDEX IF NOT EXISTS idx_assignment_categories_active
 ALTER TABLE public.assignment_categories
   DROP CONSTRAINT IF EXISTS assignment_categories_user_id_category_name_key;
 
--- Add new composite unique constraint
-ALTER TABLE public.assignment_categories
-  ADD CONSTRAINT assignment_categories_user_category_parent_unique
-  UNIQUE (user_id, category_name, COALESCE(parent_category_id, '00000000-0000-0000-0000-000000000000'::uuid));
+-- Create unique indexes to enforce constraint
+-- For root categories (parent_category_id IS NULL)
+CREATE UNIQUE INDEX IF NOT EXISTS assignment_categories_user_category_root_unique
+  ON public.assignment_categories(user_id, category_name)
+  WHERE parent_category_id IS NULL;
+
+-- For child categories (parent_category_id IS NOT NULL)
+CREATE UNIQUE INDEX IF NOT EXISTS assignment_categories_user_category_parent_unique
+  ON public.assignment_categories(user_id, category_name, parent_category_id)
+  WHERE parent_category_id IS NOT NULL;
 
 -- Step 4: Create trigger function for updated_at
 CREATE OR REPLACE FUNCTION update_assignment_categories_updated_at()
