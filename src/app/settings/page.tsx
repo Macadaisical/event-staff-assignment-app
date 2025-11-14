@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Settings,
   Plus,
@@ -11,9 +11,12 @@ import {
   Info,
   Sparkles,
   ClipboardList,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 
 import { useSupabaseStore } from '@/stores/supabase-store';
+import type { AssignmentCategory } from '@/types';
 
 export default function SettingsPage() {
   const {
@@ -22,6 +25,7 @@ export default function SettingsPage() {
     addAssignmentCategory,
     updateAssignmentCategory,
     deleteAssignmentCategory,
+    getCategoryHierarchy,
     taskCategories,
     fetchTaskCategories,
     createTaskCategory,
@@ -29,13 +33,17 @@ export default function SettingsPage() {
     deleteTaskCategory,
   } = useSupabaseStore();
 
+  // Assignment category state
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [isAddingSubcategory, setIsAddingSubcategory] = useState<string | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
+  // Task category state
   const [isAddingTaskCategory, setIsAddingTaskCategory] = useState(false);
   const [newTaskCategoryName, setNewTaskCategoryName] = useState('');
   const [newTaskCategoryColor, setNewTaskCategoryColor] = useState('#3b82f6');
@@ -57,7 +65,34 @@ export default function SettingsPage() {
     });
   }, [fetchTaskCategories]);
 
-  const handleAddCategory = async () => {
+  // Get hierarchical category structure
+  const hierarchicalCategories = useMemo(() => getCategoryHierarchy(), [assignmentCategories]);
+
+  // Auto-expand categories that have children (only once on initial load)
+  useEffect(() => {
+    const newExpanded = new Set<string>();
+    hierarchicalCategories.forEach((category) => {
+      if (category.children && category.children.length > 0) {
+        newExpanded.add(category.category_id);
+      }
+    });
+    setExpandedCategories(newExpanded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignmentCategories.length]);
+
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  };
+
+  const handleAddCategory = async (parentId?: string | null) => {
     if (!newCategoryName.trim()) {
       return;
     }
@@ -66,9 +101,13 @@ export default function SettingsPage() {
     setCategoryError(null);
 
     try {
-      await addAssignmentCategory(newCategoryName);
+      await addAssignmentCategory({
+        category_name: newCategoryName,
+        parent_category_id: parentId || null,
+      });
       setNewCategoryName('');
       setIsAddingCategory(false);
+      setIsAddingSubcategory(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to add category.';
       setCategoryError(message);
@@ -77,9 +116,9 @@ export default function SettingsPage() {
     }
   };
 
-  const startEditingCategory = (category: string) => {
-    setEditingCategory(category);
-    setEditingName(category);
+  const startEditingCategory = (categoryId: string, categoryName: string) => {
+    setEditingCategory(categoryId);
+    setEditingName(categoryName);
     setCategoryError(null);
   };
 
@@ -102,7 +141,9 @@ export default function SettingsPage() {
     setCategoryError(null);
 
     try {
-      await updateAssignmentCategory(editingCategory, editingName);
+      await updateAssignmentCategory(editingCategory, {
+        category_name: editingName,
+      });
       cancelEditing();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to update category.';
@@ -112,16 +153,16 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDeleteCategory = async (category: string) => {
-    if (!confirm(`Delete category "${category}"? This cannot be undone.`)) {
+  const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
+    if (!confirm(`Delete category "${categoryName}"? This will also delete any subcategories. This cannot be undone.`)) {
       return;
     }
 
     setCategoryError(null);
 
     try {
-      await deleteAssignmentCategory(category);
-      if (editingCategory === category) {
+      await deleteAssignmentCategory(categoryId);
+      if (editingCategory === categoryId) {
         cancelEditing();
       }
     } catch (error) {
@@ -216,6 +257,157 @@ export default function SettingsPage() {
     }
   };
 
+  const renderCategory = (category: AssignmentCategory, isChild: boolean = false) => {
+    const hasChildren = category.children && category.children.length > 0;
+    const isExpanded = expandedCategories.has(category.category_id);
+    const isEditing = editingCategory === category.category_id;
+
+    return (
+      <div key={category.category_id} className={isChild ? 'ml-6' : ''}>
+        <div
+          className={`rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-[#f5f6f7] shadow-[0_12px_28px_rgba(0,0,0,0.35)] ${
+            isChild ? 'bg-white/5' : ''
+          }`}
+        >
+          {isEditing ? (
+            <div className="flex flex-col gap-3">
+              <input
+                type="text"
+                value={editingName}
+                onChange={(event) => setEditingName(event.target.value)}
+                onKeyDown={(event) => event.key === 'Enter' && handleUpdateCategory()}
+                className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:shadow-[0_0_0_2px_rgba(233,210,154,0.25)]"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleUpdateCategory}
+                  disabled={isSavingCategory}
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500/80 to-emerald-600/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Check className="h-4 w-4" />
+                  Save
+                </button>
+                <button
+                  onClick={cancelEditing}
+                  className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#e6e7e8] transition hover:bg-white/20"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 flex-1">
+                  {hasChildren && (
+                    <button
+                      onClick={() => toggleCategory(category.category_id)}
+                      className="inline-flex items-center justify-center rounded-full bg-white/10 p-1 text-[#e6e7e8] transition hover:bg-white/20"
+                      aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </button>
+                  )}
+                  <div>
+                    <p className="text-base font-medium text-white">
+                      {category.category_name}
+                      {hasChildren && (
+                        <span className="ml-2 text-xs text-[#9aa7b5]">
+                          ({category.children?.length} subcategor{category.children?.length === 1 ? 'y' : 'ies'})
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-1 text-xs uppercase tracking-wide text-[#d0d6db]">
+                      {isChild ? 'Subcategory' : 'Parent category'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!isChild && (
+                    <button
+                      onClick={() => {
+                        setIsAddingSubcategory(category.category_id);
+                        setIsAddingCategory(false);
+                        setNewCategoryName('');
+                        setCategoryError(null);
+                      }}
+                      className="inline-flex items-center justify-center gap-1 rounded-full bg-blue-500/20 px-2 py-1 text-xs font-semibold text-blue-100 transition hover:bg-blue-500/30"
+                      aria-label={`Add subcategory to ${category.category_name}`}
+                    >
+                      <Plus className="h-3 w-3" />
+                      Sub
+                    </button>
+                  )}
+                  <button
+                    onClick={() => startEditingCategory(category.category_id, category.category_name)}
+                    className="inline-flex items-center justify-center rounded-full bg-white/10 p-2 text-[#e6e7e8] transition hover:bg-white/20"
+                    aria-label={`Edit ${category.category_name}`}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCategory(category.category_id, category.category_name)}
+                    className="inline-flex items-center justify-center rounded-full bg-red-500/20 p-2 text-red-100 transition hover:bg-red-500/30"
+                    aria-label={`Delete ${category.category_name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Add subcategory form inline */}
+              {isAddingSubcategory === category.category_id && (
+                <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4">
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(event) => setNewCategoryName(event.target.value)}
+                    onKeyDown={(event) => event.key === 'Enter' && handleAddCategory(category.category_id)}
+                    placeholder="e.g. Camera Operator, Audio Tech"
+                    className="w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white shadow-inner outline-none transition placeholder:text-[#9aa7b5] focus:border-[#e9d29a] focus:shadow-[0_0_0_2px_rgba(233,210,154,0.25)]"
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleAddCategory(category.category_id)}
+                      disabled={!newCategoryName.trim() || isSavingCategory}
+                      className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500/80 to-emerald-600/80 px-4 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Check className="h-3 w-3" />
+                      {isSavingCategory ? 'Saving…' : 'Add'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsAddingSubcategory(null);
+                        setNewCategoryName('');
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-semibold text-[#e6e7e8] transition hover:bg-white/15"
+                    >
+                      <X className="h-3 w-3" />
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Render children if expanded */}
+        {hasChildren && isExpanded && (
+          <div className="mt-2 space-y-2">
+            {category.children?.map((child) => renderCategory(child, true))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#001a24] via-[#003446] to-[#002233] text-slate-100">
       <main className="mx-auto w-full max-w-6xl px-6 py-12 lg:px-10">
@@ -236,6 +428,7 @@ export default function SettingsPage() {
             <button
               onClick={() => {
                 setIsAddingCategory(true);
+                setIsAddingSubcategory(null);
                 setEditingCategory(null);
                 setEditingName('');
                 setCategoryError(null);
@@ -243,7 +436,7 @@ export default function SettingsPage() {
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#004d66] to-[#003446] px-6 py-3 text-sm font-semibold text-[#e6e7e8] shadow-[0_8px_24px_rgba(0,0,0,0.35)] transition hover:opacity-90"
             >
               <Plus className="h-4 w-4" />
-              Add Category
+              Add Parent Category
             </button>
           </div>
         </header>
@@ -261,8 +454,8 @@ export default function SettingsPage() {
           <section className="mb-10 rounded-3xl border border-[#004d66] bg-gradient-to-br from-[rgba(0,52,70,0.55)] via-[rgba(0,36,53,0.42)] to-[rgba(0,36,53,0.32)] p-6 text-[#f5f6f7] shadow-[0_18px_36px_rgba(0,0,0,0.45)]">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold text-[#e9d29a]">Add assignment category</h2>
-                <p className="mt-2 text-sm text-[#d0d6db]">Group staffing assignments under clear categories so supervisors can plan coverage efficiently.</p>
+                <h2 className="text-2xl font-semibold text-[#e9d29a]">Add parent category</h2>
+                <p className="mt-2 text-sm text-[#d0d6db]">Create a top-level category that can contain subcategories for better organization.</p>
               </div>
               <button
                 onClick={() => {
@@ -280,14 +473,14 @@ export default function SettingsPage() {
                 type="text"
                 value={newCategoryName}
                 onChange={(event) => setNewCategoryName(event.target.value)}
-                onKeyDown={(event) => event.key === 'Enter' && handleAddCategory()}
-                placeholder="e.g. Crowd Control, Logistics, Incident Command"
+                onKeyDown={(event) => event.key === 'Enter' && handleAddCategory(null)}
+                placeholder="e.g. Technical Support, Crowd Control, Logistics"
                 className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-base text-white shadow-inner outline-none transition placeholder:text-[#9aa7b5] focus:border-[#e9d29a] focus:shadow-[0_0_0_2px_rgba(233,210,154,0.25)]"
                 autoFocus
               />
               <div className="flex gap-3 md:w-auto">
                 <button
-                  onClick={handleAddCategory}
+                  onClick={() => handleAddCategory(null)}
                   disabled={!newCategoryName.trim() || isSavingCategory}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-500/80 to-emerald-600/80 px-6 py-3 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(16,185,129,0.3)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -314,7 +507,7 @@ export default function SettingsPage() {
             <div>
               <h2 className="text-2xl font-semibold text-[#e9d29a]">Assignment Categories</h2>
               <p className="text-xs uppercase tracking-wide text-[#d0d6db]">
-                {assignmentCategories.length} category{assignmentCategories.length === 1 ? '' : 'ies'} in use
+                {assignmentCategories.length} categor{assignmentCategories.length === 1 ? 'y' : 'ies'} in use
               </p>
             </div>
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#f5f6f7]">
@@ -323,65 +516,15 @@ export default function SettingsPage() {
             </span>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {assignmentCategories.map((category) => (
-              <div
-                key={category}
-                className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-[#f5f6f7] shadow-[0_12px_28px_rgba(0,0,0,0.35)]"
-              >
-                {editingCategory === category ? (
-                  <div className="flex flex-col gap-3">
-                    <input
-                      type="text"
-                      value={editingName}
-                      onChange={(event) => setEditingName(event.target.value)}
-                      onKeyDown={(event) => event.key === 'Enter' && handleUpdateCategory()}
-                      className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-[#e9d29a] focus:shadow-[0_0_0_2px_rgba(233,210,154,0.25)]"
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={handleUpdateCategory}
-                        disabled={isSavingCategory}
-                        className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500/80 to-emerald-600/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Check className="h-4 w-4" />
-                        Save
-                      </button>
-                      <button
-                        onClick={cancelEditing}
-                        className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[#e6e7e8] transition hover:bg-white/20"
-                      >
-                        <X className="h-4 w-4" />
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-base font-medium text-white">{category}</p>
-                      <p className="mt-1 text-xs uppercase tracking-wide text-[#d0d6db]">Assignment grouping</p>
-                    </div>
-                    <div className="flex flex-col items-center gap-2">
-                      <button
-                        onClick={() => startEditingCategory(category)}
-                        className="inline-flex items-center justify-center rounded-full bg-white/10 p-2 text-[#e6e7e8] transition hover:bg-white/20"
-                        aria-label={`Edit ${category}`}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCategory(category)}
-                        className="inline-flex items-center justify-center rounded-full bg-red-500/20 p-2 text-red-100 transition hover:bg-red-500/30"
-                        aria-label={`Delete ${category}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
+          {/* Scrollable hierarchical category list */}
+          <div className="mt-6 max-h-[600px] overflow-y-auto space-y-3 pr-2">
+            {hierarchicalCategories.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+                <p className="text-sm text-[#d0d6db]">No categories yet. Click "Add Parent Category" to get started.</p>
               </div>
-            ))}
+            ) : (
+              hierarchicalCategories.map((category) => renderCategory(category))
+            )}
           </div>
         </section>
 
