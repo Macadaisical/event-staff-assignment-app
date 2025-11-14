@@ -386,9 +386,21 @@ export default function DashboardPage() {
     return readinessMap;
   }, [events, eventTasks]);
 
-  const isLoadingDashboard = authLoading || (user ? isEventLoading || isTeamMembersLoading : false);
+  const hasData = events.length > 0 && teamMembers.length > 0;
+  const isInitialLoad = !hasData && (authLoading || isEventLoading || isTeamMembersLoading);
 
-  if (authLoading || isLoadingDashboard) {
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center text-slate-200">
+          <Loader2 className="mx-auto h-10 w-10 animate-spin text-blue-300" />
+          <p className="mt-4 text-sm text-slate-300">Authenticating...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isInitialLoad) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="text-center text-slate-200">
