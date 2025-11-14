@@ -55,6 +55,7 @@ export default function CreateEventPage() {
     assignmentCategories,
     fetchTeamMembers,
     fetchAssignmentCategories,
+    getCategoryHierarchy,
   } = useSupabaseStore();
   const { user } = useAuth();
 
@@ -82,10 +83,35 @@ export default function CreateEventPage() {
   );
 
   const assignmentCategoryOptions = useMemo(() => {
-    const base = assignmentCategories.length ? assignmentCategories : ['General Support'];
-    const unique = Array.from(new Set([...base, 'General Support']));
-    return unique.map((category) => ({ value: category, label: category }));
-  }, [assignmentCategories]);
+    const hierarchicalCategories = getCategoryHierarchy();
+    const options: { value: string; label: string }[] = [];
+
+    // Flatten hierarchy into options with visual indicators
+    hierarchicalCategories.forEach((parent) => {
+      // Add parent category
+      options.push({
+        value: parent.category_name,
+        label: parent.category_name,
+      });
+
+      // Add children with indentation indicator
+      if (parent.children && parent.children.length > 0) {
+        parent.children.forEach((child) => {
+          options.push({
+            value: child.category_name,
+            label: `${parent.category_name} > ${child.category_name}`,
+          });
+        });
+      }
+    });
+
+    // Add fallback if no categories
+    if (options.length === 0) {
+      options.push({ value: 'General Support', label: 'General Support' });
+    }
+
+    return options;
+  }, [getCategoryHierarchy]);
 
   const teamMemberNameOptions = useMemo(
     () =>
@@ -238,7 +264,7 @@ export default function CreateEventPage() {
       ...prev,
       {
         member_id: '',
-        assignment_type: assignmentCategories[0] || 'General Support',
+        assignment_type: assignmentCategoryOptions[0]?.value || 'General Support',
         equipment_area: '',
         start_time: '',
         end_time: '',
