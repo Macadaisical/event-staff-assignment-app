@@ -16,11 +16,10 @@ import {
   Save,
   AlertTriangle
 } from 'lucide-react';
-import type { AssignmentCategory } from '@/types';
 
 interface AssignmentForm {
   member_id: string;
-  assignment_type: AssignmentCategory;
+  assignment_type: string;
   equipment_area: string;
   start_time: string;
   end_time: string;
@@ -43,6 +42,7 @@ export default function EventAssignmentsPage() {
     fetchTeamAssignments,
     getTeamAssignments,
     teamAssignments,
+    getCategoryHierarchy,
   } = useSupabaseStore();
 
   useEffect(() => {
@@ -189,7 +189,7 @@ export default function EventAssignmentsPage() {
   const addAssignment = () => {
     setAssignments(prev => [...prev, {
       member_id: '',
-      assignment_type: assignmentCategories[0] || 'General Support',
+      assignment_type: categoryOptions[0]?.value || 'General Support',
       equipment_area: '',
       start_time: event.start_time || '',
       end_time: event.end_time || '',
@@ -292,10 +292,36 @@ export default function EventAssignmentsPage() {
     label: member.member_name
   }));
 
-  const categoryOptions = assignmentCategories.map(category => ({
-    value: category,
-    label: category
-  }));
+  const categoryOptions = (() => {
+    const hierarchicalCategories = getCategoryHierarchy();
+    const options: { value: string; label: string }[] = [];
+
+    // Flatten hierarchy into options with visual indicators
+    hierarchicalCategories.forEach((parent) => {
+      // Add parent category
+      options.push({
+        value: parent.category_name,
+        label: parent.category_name,
+      });
+
+      // Add children with indentation indicator
+      if (parent.children && parent.children.length > 0) {
+        parent.children.forEach((child) => {
+          options.push({
+            value: child.category_name,
+            label: `${parent.category_name} > ${child.category_name}`,
+          });
+        });
+      }
+    });
+
+    // Add fallback if no categories
+    if (options.length === 0) {
+      options.push({ value: 'General Support', label: 'General Support' });
+    }
+
+    return options;
+  })();
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -418,7 +444,7 @@ export default function EventAssignmentsPage() {
                 >
                   <Select
                     value={assignment.assignment_type}
-                    onChange={(e) => updateAssignment(index, 'assignment_type', e.target.value as AssignmentCategory)}
+                    onChange={(e) => updateAssignment(index, 'assignment_type', e.target.value)}
                     options={categoryOptions}
                     error={!!errors[`assignment_${index}_assignment_type`]}
                   />
