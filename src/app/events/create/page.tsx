@@ -52,7 +52,6 @@ export default function CreateEventPage() {
     addTeamAssignments,
     addTrafficControls,
     teamMembers,
-    assignmentCategories,
     fetchTeamMembers,
     fetchAssignmentCategories,
     getCategoryHierarchy,

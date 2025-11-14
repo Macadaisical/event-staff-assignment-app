@@ -34,35 +34,10 @@ const DEFAULT_ASSIGNMENT_TYPE = 'General Support';
 const DEFAULT_EQUIPMENT_AREA = 'Assignment TBD';
 const DEFAULT_PATROL_VEHICLE = 'Vehicle TBD';
 const DEFAULT_AREA_ASSIGNMENT = 'Area TBD';
-// Note: Default categories are now seeded in database via migration
-// Keeping a simple fallback list for category names only
-const DEFAULT_CATEGORY_NAMES: string[] = [
-  'Equipment Operator',
-  'Safety Monitor',
-  'Setup/Breakdown',
-  'Crowd Control',
-  'Communications',
-  'First Aid',
-  'General Support',
-  'Technical Support',
-];
 const DEFAULT_TASK_COLOR = '#2563EB';
 const DEFAULT_TASK_STATUS: TaskStatus = 'Not Started';
 
 const normalizeCategoryName = (value: string): string => value.trim().replace(/\s+/g, ' ');
-const dedupeAndSortCategories = (categories: string[]): string[] => {
-  const unique: string[] = [];
-  categories.forEach((name) => {
-    const normalized = normalizeCategoryName(name);
-    if (!normalized) {
-      return;
-    }
-    if (!unique.some((existing) => existing.toLowerCase() === normalized.toLowerCase())) {
-      unique.push(normalized);
-    }
-  });
-  return unique.sort((a, b) => a.localeCompare(b));
-};
 
 const normalizeDbText = (value: string | null, fallback: string): string | null => {
   if (!value) return null;

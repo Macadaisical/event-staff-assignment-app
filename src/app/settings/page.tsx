@@ -66,7 +66,7 @@ export default function SettingsPage() {
   }, [fetchTaskCategories]);
 
   // Get hierarchical category structure
-  const hierarchicalCategories = useMemo(() => getCategoryHierarchy(), [assignmentCategories]);
+  const hierarchicalCategories = useMemo(() => getCategoryHierarchy(), [getCategoryHierarchy, assignmentCategories]);
 
   // Auto-expand categories that have children (only once on initial load)
   useEffect(() => {
@@ -520,7 +520,7 @@ export default function SettingsPage() {
           <div className="mt-6 max-h-[600px] overflow-y-auto space-y-3 pr-2">
             {hierarchicalCategories.length === 0 ? (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
-                <p className="text-sm text-[#d0d6db]">No categories yet. Click "Add Parent Category" to get started.</p>
+                <p className="text-sm text-[#d0d6db]">No categories yet. Click &ldquo;Add Parent Category&rdquo; to get started.</p>
               </div>
             ) : (
               hierarchicalCategories.map((category) => renderCategory(category))

@@ -32,7 +32,6 @@ export default function EventAssignmentsPage() {
   const {
     events,
     teamMembers,
-    assignmentCategories,
     replaceTeamAssignments,
     fetchEvents,
     fetchTeamMembers,
